@@ -686,12 +686,10 @@ export default function ReportPage() {
                                         </div>
                                     )}
 
-                                    {/* AI not available error */}
-                                    {ai?.error && !ai.available && (
-                                        <div className="text-center py-8 space-y-2">
-                                            <Brain size={28} className="mx-auto text-gray-600" />
-                                            <p className="text-xs text-gray-400">AI unavailable</p>
-                                            <p className="text-[10px] text-gray-600">{ai.error}</p>
+                                    {/* AI deep analysis error (non-blocking) */}
+                                    {ai?.error && !ai.available && chatMessages.length === 0 && (
+                                        <div className="text-center py-4 space-y-1 opacity-60">
+                                            <p className="text-[10px] text-gray-500">Deep analysis unavailable — chat still works</p>
                                         </div>
                                     )}
 

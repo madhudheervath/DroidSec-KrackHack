@@ -100,6 +100,23 @@ def _find_report_file(scan_id: str, filename: str) -> Optional[str]:
     return None
 
 
+def _get_scan_data(scan_id: str) -> Optional[dict]:
+    """Get scan data from in-memory cache or load from disk report."""
+    if scan_id in scans:
+        return scans[scan_id]
+    json_path = _find_report_file(scan_id, "report.json")
+    if json_path:
+        try:
+            with open(json_path) as f:
+                data = json.load(f)
+            # Cache in memory for subsequent calls (chat history etc.)
+            scans[scan_id] = data
+            return data
+        except Exception:
+            pass
+    return None
+
+
 def _update_scan_state(scan_id: str, **updates) -> None:
     with scan_lock:
         current = active_scans.get(scan_id, {"scan_id": scan_id})
@@ -608,10 +625,11 @@ async def ai_deep_analysis(scan_id: str):
     if not ai.is_available:
         raise HTTPException(400, "AI not configured. POST your Gemini API key to /api/ai/config first.")
 
-    if scan_id not in scans:
+    scan_data = _get_scan_data(scan_id)
+    if scan_data is None:
         raise HTTPException(404, "Scan not found")
 
-    report_data = scans[scan_id]
+    report_data = scan_data
     logger.info(f"[{scan_id}] Running AI deep analysis...")
 
     result = await ai.deep_analysis(report_data)
@@ -625,10 +643,11 @@ async def ai_chat(req: AIChatRequest):
     if not ai.is_available:
         raise HTTPException(400, "AI not configured.")
 
-    if req.scan_id not in scans:
+    scan_data = _get_scan_data(req.scan_id)
+    if scan_data is None:
         raise HTTPException(404, "Scan not found")
 
-    response = await ai.chat(req.scan_id, req.message, scans[req.scan_id])
+    response = await ai.chat(req.scan_id, req.message, scan_data)
     return {"response": response}
 
 
@@ -639,10 +658,11 @@ async def ai_remediate(req: AIRemediateRequest):
     if not ai.is_available:
         raise HTTPException(400, "AI not configured.")
 
-    if req.scan_id not in scans:
+    scan_data = _get_scan_data(req.scan_id)
+    if scan_data is None:
         raise HTTPException(404, "Scan not found")
 
-    findings = scans[req.scan_id].get("findings", [])
+    findings = scan_data.get("findings", [])
     if req.finding_index < 0 or req.finding_index >= len(findings):
         raise HTTPException(400, "Invalid finding index")
 
