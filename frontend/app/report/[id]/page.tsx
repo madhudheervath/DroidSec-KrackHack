@@ -20,6 +20,7 @@ import {
 import NeonCard from '../../components/NeonCard'
 import CyberBackground from '../../components/CyberBackground'
 import { apiUrl } from '../../lib/api'
+import { exportPDF, exportJSON, exportCSV } from '../../lib/exportReport'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -273,6 +274,8 @@ export default function ReportPage() {
     const [chatSending, setChatSending] = useState(false)
     const chatEndRef = useRef<HTMLDivElement>(null)
     const chatInputRef = useRef<HTMLTextAreaElement>(null)
+    const [exportOpen, setExportOpen] = useState(false)
+    const exportRef = useRef<HTMLDivElement>(null)
 
     /* fetch report */
     useEffect(() => {
@@ -311,6 +314,16 @@ export default function ReportPage() {
             setTimeout(() => chatInputRef.current?.focus(), 300)
         }
     }, [aiOpen, aiLoading, chatSending])
+
+    /* close export dropdown on outside click */
+    useEffect(() => {
+        if (!exportOpen) return
+        const handler = (e: MouseEvent) => {
+            if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false)
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [exportOpen])
 
     /* send chat message */
     const sendChat = useCallback(async (msg?: string) => {
@@ -413,10 +426,47 @@ export default function ReportPage() {
                     </Link>
                     <div className="flex items-center gap-3">
                         <span className="text-[10px] text-gray-600 font-mono hidden md:inline">ID: {report.scan_id}</span>
-                        <a href={apiUrl(`/api/report/${params.id}/download`)}
-                           className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-lg transition-colors text-xs font-bold">
-                            <Download size={14} /> Export
-                        </a>
+                        <div className="relative" ref={exportRef}>
+                            <button onClick={() => setExportOpen(o => !o)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-lg transition-colors text-xs font-bold">
+                                <Download size={14} /> Export <ChevronDown size={12} className={`transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            <AnimatePresence>
+                                {exportOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -6, scale: 0.95 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="absolute right-0 mt-2 w-52 bg-[#0c0c14] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[60]">
+                                        <div className="py-1">
+                                            <button onClick={() => { exportPDF(report as any); setExportOpen(false) }}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                                                <FileText size={14} className="text-red-400" />
+                                                <div className="text-left"><div className="font-bold">PDF Report</div><div className="text-[10px] text-gray-600">Professional formatted report</div></div>
+                                            </button>
+                                            <button onClick={() => { exportJSON(report as any); setExportOpen(false) }}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                                                <Code size={14} className="text-yellow-400" />
+                                                <div className="text-left"><div className="font-bold">JSON Data</div><div className="text-[10px] text-gray-600">Machine-readable format</div></div>
+                                            </button>
+                                            <button onClick={() => { exportCSV(report as any); setExportOpen(false) }}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                                                <BarChart3 size={14} className="text-green-400" />
+                                                <div className="text-left"><div className="font-bold">CSV Findings</div><div className="text-[10px] text-gray-600">Spreadsheet compatible</div></div>
+                                            </button>
+                                            <div className="border-t border-white/5 my-1" />
+                                            <a href={apiUrl(`/api/report/${params.id}/download`)}
+                                                onClick={() => setExportOpen(false)}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                                                <Download size={14} className="text-cyan-400" />
+                                                <div className="text-left"><div className="font-bold">HTML Report</div><div className="text-[10px] text-gray-600">Standalone web report</div></div>
+                                            </a>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
                     </div>
                 </div>
             </nav>
