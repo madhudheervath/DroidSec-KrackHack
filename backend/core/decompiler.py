@@ -5,6 +5,7 @@ import subprocess
 import os
 import shutil
 import logging
+import zipfile
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,19 @@ class Decompiler:
         self.work_dir = work_dir
         self.apktool_path = os.path.join(TOOLS_DIR, "apktool")
         self.jadx_path = os.path.join(TOOLS_DIR, "jadx", "bin", "jadx")
+
+    @staticmethod
+    def _dex_file_count(apk_path: str) -> int:
+        """Return number of classes*.dex files inside APK."""
+        try:
+            with zipfile.ZipFile(apk_path, "r") as zf:
+                return sum(
+                    1
+                    for name in zf.namelist()
+                    if os.path.basename(name).startswith("classes") and name.endswith(".dex")
+                )
+        except Exception:
+            return 0
 
     def decompile(self, apk_path: str, scan_id: str) -> dict:
         """
@@ -43,6 +57,8 @@ class Decompiler:
             "smali_dirs": [],
             "java_dirs": [],
             "resource_dirs": [],
+            "dex_file_count": self._dex_file_count(apk_path),
+            "analysis_mode": "full",
             "success": False,
             "errors": [],
         }
@@ -141,9 +157,26 @@ class Decompiler:
                 result["errors"].append(f"Zip fallback failed: {e}")
                 logger.error(f"[{scan_id}] Zip fallback failed: {e}")
 
-        result["success"] = bool(result["manifest_path"] or result["source_dirs"])
+        # De-duplicate paths in a stable order
+        result["source_dirs"] = list(dict.fromkeys(result["source_dirs"]))
+        result["resource_dirs"] = list(dict.fromkeys(result["resource_dirs"]))
+
+        # If APK contains DEX, code extraction is mandatory for a trustworthy scan.
+        if result["dex_file_count"] > 0 and not result["source_dirs"]:
+            result["errors"].append(
+                "Code extraction failed: APK contains DEX bytecode but no source/smali output was produced."
+            )
+            result["analysis_mode"] = "incomplete"
+            result["success"] = False
+        else:
+            # Resource-only/split APKs can still be scanned in manifest-only mode.
+            if result["dex_file_count"] == 0:
+                result["analysis_mode"] = "manifest_only"
+            result["success"] = bool(result["manifest_path"] or result["source_dirs"])
+
         logger.info(f"[{scan_id}] Decompilation result: success={result['success']}, "
                     f"source_dirs={len(result['source_dirs'])}, "
+                    f"dex={result['dex_file_count']}, mode={result['analysis_mode']}, "
                     f"errors={len(result['errors'])}")
         return result
 

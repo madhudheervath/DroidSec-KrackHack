@@ -41,6 +41,7 @@ interface Report {
     scan_id: string
     package?: string
     timestamp?: string
+    total_findings?: number
     security_score?: {
         score: number
         grade: string
@@ -95,6 +96,8 @@ export default function ReportPage() {
     const grade = report.security_score?.grade || '?'
     const breakdown = report.severity_breakdown || {}
     const findings = report.findings || []
+    const timestampText = report.timestamp ? new Date(report.timestamp).toLocaleString() : "N/A"
+    const totalFindings = report.total_findings ?? findings.length
 
     // Support pre-filtering based on query but default to all
     const filteredFindings = findings.filter((f: Finding) =>
@@ -141,7 +144,7 @@ export default function ReportPage() {
                                 </div>
                                 <div>
                                     <p className="text-gray-500 uppercase">Scan Timestamp</p>
-                                    <p className="text-white">{new Date(report.timestamp || "").toLocaleString()}</p>
+                                    <p className="text-white">{timestampText}</p>
                                 </div>
                                 <div>
                                     <p className="text-gray-500 uppercase">Analysis Engine</p>
@@ -162,7 +165,7 @@ export default function ReportPage() {
                             <div className="mt-6 flex flex-wrap gap-4 pt-4 border-t border-white/5">
                                 <div className="flex flex-col">
                                     <span className="text-xs text-gray-500 uppercase">Total Vulns</span>
-                                    <span className="text-xl font-bold text-white">{report.findings?.length || 0}</span>
+                                    <span className="text-xl font-bold text-white">{totalFindings}</span>
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-xs text-gray-500 uppercase">Risk Level</span>

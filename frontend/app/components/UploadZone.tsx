@@ -63,7 +63,20 @@ export default function UploadZone() {
                 body: formData,
             })
 
-            if (!res.ok) throw new Error("Scan failed")
+            if (!res.ok) {
+                let message = "Scan failed"
+                try {
+                    const errData = await res.json()
+                    message = errData?.detail || message
+                } catch {
+                    try {
+                        message = await res.text()
+                    } catch {
+                        // keep default
+                    }
+                }
+                throw new Error(message)
+            }
 
             const data = await res.json()
             const scanId = data.scan_id || data.metadata?.scan_id
@@ -73,8 +86,9 @@ export default function UploadZone() {
             } else {
                 setError("Invalid server response")
             }
-        } catch {
-            setError("Upload failed. Is the backend running?")
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Upload failed. Is the backend running?"
+            setError(message)
         } finally {
             setUploading(false)
         }

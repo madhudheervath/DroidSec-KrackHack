@@ -172,6 +172,10 @@ def calculate_security_score(findings: List[Dict], files_scanned: int = 0) -> Di
     high_unique = sum(1 for f in unique_findings if f.get("severity") == "high")
     malware_unique = [f for f in unique_findings if str(f.get("id", "")).upper().startswith("MAL")]
     malware_high = sum(1 for f in malware_unique if f.get("severity") in ("high", "critical"))
+    analysis_issues = [
+        f for f in unique_findings
+        if str(f.get("id", "")).upper().startswith("ANL") and f.get("severity") in ("high", "critical")
+    ]
 
     if critical_unique >= 1:
         score = min(score, 68)
@@ -183,6 +187,8 @@ def calculate_security_score(findings: List[Dict], files_scanned: int = 0) -> Di
         score = min(score, 58)
     if malware_high >= 3 or (critical_unique >= 2 and malware_unique):
         score = min(score, 45)
+    if analysis_issues:
+        score = min(score, 55)
 
     # Grade assignment
     if score >= 85:

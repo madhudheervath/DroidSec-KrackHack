@@ -88,6 +88,12 @@ def _find_report_file(scan_id: str, filename: str) -> Optional[str]:
 
 def _recompute_report_score(report_data: dict) -> dict:
     """Refresh score/severity fields from stored findings so scoring updates apply to old reports."""
+    metadata = report_data.get("metadata", {}) if isinstance(report_data.get("metadata"), dict) else {}
+    if not report_data.get("package"):
+        report_data["package"] = metadata.get("package", "unknown")
+    if not report_data.get("timestamp"):
+        report_data["timestamp"] = datetime.utcnow().isoformat()
+
     findings = report_data.get("findings") or []
     if not isinstance(findings, list) or not findings:
         return report_data
@@ -114,13 +120,35 @@ def root():
     return {"name": "DroidSec", "version": "1.0.0", "status": "running"}
 
 
+@app.get("/api/health")
+def health():
+    """Runtime diagnostics for deployment debugging."""
+    apktool = decompiler.apktool_path
+    jadx = decompiler.jadx_path
+    return {
+        "status": "ok",
+        "apktool_path": apktool,
+        "apktool_exists": os.path.exists(apktool),
+        "jadx_path": jadx,
+        "jadx_exists": os.path.exists(jadx),
+        "data_root": DATA_ROOT,
+        "report_dir": REPORT_DIR,
+    }
+
+
 def _run_scan_pipeline(scan_id: str, apk_filename: str, apk_path: str) -> dict:
     """Run full scan synchronously; called from threadpool to keep event loop responsive."""
     # Step 1: Decompile
     logger.info(f"[{scan_id}] Decompiling...")
     decompile_result = decompiler.decompile(apk_path, scan_id)
     if not decompile_result["success"]:
-        raise HTTPException(500, f"Decompilation failed: {decompile_result['errors']}")
+        detail = "; ".join(decompile_result.get("errors", [])) or "Unknown decompilation failure"
+        if decompile_result.get("dex_file_count", 0) == 0:
+            raise HTTPException(
+                400,
+                "Uploaded APK has no classes.dex (likely split/config APK). Upload the base APK for full analysis."
+            )
+        raise HTTPException(500, f"Decompilation failed: {detail}")
 
     # Step 2: Analyze manifest
     logger.info(f"[{scan_id}] Analyzing manifest...")
@@ -195,11 +223,42 @@ def _run_scan_pipeline(scan_id: str, apk_filename: str, apk_path: str) -> dict:
 
     # Step 14: Aggregate ALL findings and score
     logger.info(f"[{scan_id}] Generating report...")
+    decompile_errors = decompile_result.get("errors", [])
     all_extra_findings = (
         malware_findings + entropy_findings + network_findings +
         signing_findings + cloud_findings + deeplink_findings +
         binary_findings + modern_findings
     )
+
+    # Explicitly flag reduced-coverage runs so they never look "clean".
+    if decompile_result.get("analysis_mode") == "manifest_only":
+        all_extra_findings.append({
+            "id": "ANL001",
+            "name": "Manifest-Only Analysis (No DEX Bytecode)",
+            "severity": "high",
+            "confidence": "high",
+            "owasp": "M8",
+            "location": "Decompiler",
+            "source_type": "resource",
+            "evidence": "No classes*.dex files detected in uploaded APK",
+            "description": "This APK appears to be a split/config resource package. Code-level checks cannot run without DEX bytecode.",
+            "remediation": "Upload the base APK (or merged universal APK) that contains classes.dex for complete static analysis.",
+        })
+
+    if decompile_errors:
+        all_extra_findings.append({
+            "id": "ANL002",
+            "name": "Partial Analysis Due to Decompiler Errors",
+            "severity": "high" if files_scanned < 20 else "medium",
+            "confidence": "high",
+            "owasp": "M8",
+            "location": "Decompiler",
+            "source_type": "resource",
+            "evidence": "; ".join(decompile_errors)[:500],
+            "description": "One or more decompilation stages failed or were degraded. Findings may be incomplete.",
+            "remediation": "Verify apktool/jadx tooling in deployment logs and re-run scan with a valid base APK.",
+        })
+
     report_data = aggregate_findings(
         manifest_findings=manifest_result["findings"],
         code_findings=code_findings,
@@ -214,7 +273,12 @@ def _run_scan_pipeline(scan_id: str, apk_filename: str, apk_path: str) -> dict:
     report_data["metadata"] = metadata
     report_data["scan_id"] = scan_id
     report_data["apk_filename"] = apk_filename
-    report_data["decompile_errors"] = decompile_result.get("errors", [])
+    report_data["decompile_errors"] = decompile_errors
+    report_data["files_scanned"] = files_scanned
+    report_data["analysis_mode"] = decompile_result.get("analysis_mode", "full")
+    report_data["dex_file_count"] = decompile_result.get("dex_file_count", 0)
+    report_data["package"] = metadata.get("package", "unknown")
+    report_data["timestamp"] = datetime.utcnow().isoformat()
 
     # Step 15: Save reports
     report_output_dir = os.path.join(REPORT_DIR, scan_id)
