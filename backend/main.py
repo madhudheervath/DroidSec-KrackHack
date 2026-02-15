@@ -76,6 +76,8 @@ app.add_middleware(
 decompiler = Decompiler()
 
 # In-memory scan store (for hackathon simplicity)
+MAX_SCANS = 50                  # evict oldest entries beyond this
+MAX_APK_SIZE = 200 * 1024 * 1024  # 200 MB upload limit
 scans = {}
 active_scans = {}
 scan_lock = threading.Lock()
@@ -443,11 +445,23 @@ async def scan_apk(file: UploadFile = File(...)):
                 chunk = await file.read(1024 * 1024)
                 if not chunk:
                     break
-                f.write(chunk)
                 total_bytes += len(chunk)
+                if total_bytes > MAX_APK_SIZE:
+                    f.close()
+                    os.remove(apk_path)
+                    raise HTTPException(413, f"File too large. Maximum allowed size is {MAX_APK_SIZE // (1024*1024)} MB")
+                f.write(chunk)
         logger.info(f"[{scan_id}] Saved APK: {file.filename} ({total_bytes} bytes)")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"Failed to save file: {e}")
+
+    # Evict oldest scan entries if the in-memory cache is too large
+    if len(scans) >= MAX_SCANS:
+        oldest = sorted(scans.keys(), key=lambda k: scans[k].get("queued_at", ""))[:len(scans) - MAX_SCANS + 1]
+        for k in oldest:
+            scans.pop(k, None)
 
     _update_scan_state(scan_id, **{
         "name": file.filename,
@@ -548,21 +562,6 @@ def download_report(scan_id: str):
             filename=f"droidsec-report-{scan_id}.html",
         )
     raise HTTPException(404, "Report not found")
-
-
-@app.get("/api/scans")
-def list_scans():
-    """List all completed scans."""
-    results = []
-    for sid, data in scans.items():
-        results.append({
-            "scan_id": sid,
-            "filename": data.get("apk_filename", "unknown"),
-            "score": data.get("security_score", {}).get("score", 0),
-            "grade": data.get("security_score", {}).get("grade", "?"),
-            "total_findings": data.get("total_findings", 0),
-        })
-    return results
 
 
 @app.get("/api/batch-status")

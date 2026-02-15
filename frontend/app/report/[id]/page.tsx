@@ -8,9 +8,9 @@ import {
     Shield, ShieldAlert, ShieldCheck, AlertTriangle, Info,
     FileText, ArrowLeft, Download, Code, ChevronDown,
     Bug, Lock, Wifi, Eye, Smartphone, Database, Key, Layers,
-    BarChart3, Activity, Target, Zap, Clock, Package, FileCode,
-    CheckCircle, XCircle, AlertCircle, TrendingDown, Brain, X, Sparkles,
-    Send, MessageCircle, CornerDownLeft, Loader2
+    BarChart3, Target, Clock, Package, FileCode,
+    CheckCircle, XCircle, AlertCircle, Brain, X, Sparkles,
+    Send, MessageCircle, CornerDownLeft, Loader2, Search
 } from 'lucide-react'
 import {
     RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -185,9 +185,63 @@ function SevPill({ severity }: { severity: string }) {
     )
 }
 
-function FindingCard({ finding, open = false }: { finding: Finding; open?: boolean }) {
+/* shared markdown renderer config */
+const mdComponents = {
+    p: ({children}: any) => <p className="mb-2 last:mb-0">{children}</p>,
+    strong: ({children}: any) => <strong className="text-white font-semibold">{children}</strong>,
+    em: ({children}: any) => <em className="text-purple-300">{children}</em>,
+    h1: ({children}: any) => <h3 className="text-sm font-bold text-white mt-3 mb-1.5">{children}</h3>,
+    h2: ({children}: any) => <h3 className="text-sm font-bold text-white mt-3 mb-1.5">{children}</h3>,
+    h3: ({children}: any) => <h4 className="text-[13px] font-bold text-white mt-2.5 mb-1">{children}</h4>,
+    ul: ({children}: any) => <ul className="list-disc list-outside ml-4 mb-2 space-y-0.5">{children}</ul>,
+    ol: ({children}: any) => <ol className="list-decimal list-outside ml-4 mb-2 space-y-0.5">{children}</ol>,
+    li: ({children}: any) => <li className="text-gray-300">{children}</li>,
+    code: ({className, children, ...props}: any) => {
+        const isBlock = className?.includes('language-')
+        if (isBlock) {
+            return (
+                <div className="my-2 rounded-lg overflow-hidden border border-white/10">
+                    <div className="bg-white/[0.06] px-3 py-1 text-[9px] text-gray-500 font-mono border-b border-white/5">
+                        {className?.replace('language-', '') || 'code'}
+                    </div>
+                    <pre className="bg-[#0d0d1a] p-3 overflow-x-auto"><code className="text-[11px] font-mono text-emerald-300 leading-relaxed">{children}</code></pre>
+                </div>
+            )
+        }
+        return <code className="bg-white/10 text-purple-300 px-1.5 py-0.5 rounded text-[11px] font-mono" {...props}>{children}</code>
+    },
+    pre: ({children}: any) => <>{children}</>,
+    blockquote: ({children}: any) => <blockquote className="border-l-2 border-yellow-500/50 pl-3 my-2 text-yellow-200/80 italic">{children}</blockquote>,
+    a: ({href, children}: any) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-purple-400 underline hover:text-purple-300">{children}</a>,
+    table: ({children}: any) => <div className="overflow-x-auto my-2"><table className="text-[10px] border-collapse w-full">{children}</table></div>,
+    th: ({children}: any) => <th className="border border-white/10 bg-white/5 px-2 py-1 text-left text-gray-300 font-bold">{children}</th>,
+    td: ({children}: any) => <td className="border border-white/10 px-2 py-1 text-gray-400">{children}</td>,
+}
+
+function FindingCard({ finding, open = false, findingIndex, scanId }: { finding: Finding; open?: boolean; findingIndex: number; scanId: string }) {
     const [exp, setExp] = useState(open)
+    const [aiRem, setAiRem] = useState<string | null>(null)
+    const [aiRemLoading, setAiRemLoading] = useState(false)
     const c = SEV[finding.severity] || SEV.info
+
+    const handleRemediate = async () => {
+        if (aiRem || aiRemLoading) return
+        setAiRemLoading(true)
+        try {
+            const res = await fetch(apiUrl('/api/ai/remediate'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scan_id: scanId, finding_index: findingIndex })
+            })
+            if (!res.ok) throw new Error('Failed')
+            const data = await res.json()
+            setAiRem(data.remediation || 'No remediation available.')
+        } catch {
+            setAiRem('Failed to generate AI remediation. Please try again.')
+        } finally {
+            setAiRemLoading(false)
+        }
+    }
 
     return (
         <motion.div layout className={`glass-card overflow-hidden border ${c.border}`}
@@ -251,6 +305,29 @@ function FindingCard({ finding, open = false }: { finding: Finding; open?: boole
                                     <p className="text-xs text-gray-300 leading-relaxed">{finding.remediation}</p>
                                 </div>
                             )}
+
+                            {/* AI Fix Button */}
+                            <button
+                                onClick={handleRemediate}
+                                disabled={aiRemLoading || !!aiRem}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg transition-colors text-[11px] font-bold disabled:opacity-50"
+                            >
+                                {aiRemLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                {aiRem ? 'AI Fix Generated' : aiRemLoading ? 'Generating fix…' : 'Fix with AI'}
+                            </button>
+
+                            {/* AI Remediation Response */}
+                            {aiRem && (
+                                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                                    className="bg-purple-500/[0.05] border border-purple-500/20 rounded-lg p-4">
+                                    <h4 className="text-purple-400 text-[10px] font-black mb-2 flex items-center gap-1.5 uppercase tracking-widest"><Sparkles size={12} /> AI-Powered Fix</h4>
+                                    <div className="text-xs text-gray-300 leading-relaxed chat-md">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                                            {aiRem}
+                                        </ReactMarkdown>
+                                    </div>
+                                </motion.div>
+                            )}
                         </div>
                     </motion.div>
                 )}
@@ -267,7 +344,9 @@ export default function ReportPage() {
     const [report, setReport]       = useState<Report | null>(null)
     const [loading, setLoading]     = useState(true)
     const [filter, setFilter]       = useState('all')
+    const [search, setSearch]       = useState('')
     const [tab, setTab]             = useState<'findings' | 'owasp'>('findings')
+    const [toast, setToast]         = useState<{ msg: string; show: boolean }>({ msg: '', show: false })
     const [ai, setAi]               = useState<AIAnalysis | null>(null)
     const [aiLoading, setAiLoading] = useState(false)
     const [aiOpen, setAiOpen]       = useState(false)
@@ -361,6 +440,12 @@ export default function ReportPage() {
         }
     }, [chatInput, chatSending, params.id])
 
+    /* show toast helper */
+    const showToast = useCallback((msg: string) => {
+        setToast({ msg, show: true })
+        setTimeout(() => setToast(t => ({ ...t, show: false })), 3000)
+    }, [])
+
     /* derived */
     const score      = report?.security_score?.score ?? 0
     const grade      = report?.security_score?.grade ?? '?'
@@ -369,11 +454,13 @@ export default function ReportPage() {
     const meta       = report?.metadata ?? {}
     const total      = report?.total_findings ?? findings.length
 
-    const filtered = useMemo(() =>
-        findings
+    const filtered = useMemo(() => {
+        const q = search.toLowerCase().trim()
+        return findings
             .filter(f => filter === 'all' || f.severity === filter)
-            .sort((a, b) => (SEV[a.severity]?.order ?? 3) - (SEV[b.severity]?.order ?? 3)),
-        [findings, filter])
+            .filter(f => !q || f.name?.toLowerCase().includes(q) || f.description?.toLowerCase().includes(q) || f.location?.toLowerCase().includes(q) || f.evidence?.toLowerCase().includes(q) || f.id?.toLowerCase().includes(q))
+            .sort((a, b) => (SEV[a.severity]?.order ?? 3) - (SEV[b.severity]?.order ?? 3))
+    }, [findings, filter, search])
 
     const owaspData = useMemo(() => {
         if (!report?.owasp_breakdown) return []
@@ -434,24 +521,24 @@ export default function ReportPage() {
                                         transition={{ duration: 0.15 }}
                                         className="absolute right-0 mt-2 w-52 bg-[#0c0c14] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[60]">
                                         <div className="py-1">
-                                            <button onClick={() => { exportPDF(report as any); setExportOpen(false) }}
+                                            <button onClick={() => { exportPDF(report as any); setExportOpen(false); showToast('PDF report downloaded') }}
                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
                                                 <FileText size={14} className="text-red-400" />
                                                 <div className="text-left"><div className="font-bold">PDF Report</div><div className="text-[10px] text-gray-600">Professional formatted report</div></div>
                                             </button>
-                                            <button onClick={() => { exportJSON(report as any); setExportOpen(false) }}
+                                            <button onClick={() => { exportJSON(report as any); setExportOpen(false); showToast('JSON data downloaded') }}
                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
                                                 <Code size={14} className="text-yellow-400" />
                                                 <div className="text-left"><div className="font-bold">JSON Data</div><div className="text-[10px] text-gray-600">Machine-readable format</div></div>
                                             </button>
-                                            <button onClick={() => { exportCSV(report as any); setExportOpen(false) }}
+                                            <button onClick={() => { exportCSV(report as any); setExportOpen(false); showToast('CSV findings downloaded') }}
                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
                                                 <BarChart3 size={14} className="text-green-400" />
                                                 <div className="text-left"><div className="font-bold">CSV Findings</div><div className="text-[10px] text-gray-600">Spreadsheet compatible</div></div>
                                             </button>
                                             <div className="border-t border-white/5 my-1" />
                                             <a href={apiUrl(`/api/report/${params.id}/download`)}
-                                                onClick={() => setExportOpen(false)}
+                                                onClick={() => { setExportOpen(false); showToast('HTML report downloaded') }}
                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-xs text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
                                                 <Download size={14} className="text-cyan-400" />
                                                 <div className="text-left"><div className="font-bold">HTML Report</div><div className="text-[10px] text-gray-600">Standalone web report</div></div>
@@ -565,7 +652,18 @@ export default function ReportPage() {
                 {/* ══════════ TAB: FINDINGS ══════════ */}
                 {tab === 'findings' && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="relative flex-1 max-w-xs">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="Search findings…"
+                                    className="w-full bg-white/[0.04] border border-white/10 focus:border-purple-500/40 rounded-lg pl-9 pr-3 py-1.5 text-xs text-gray-200 placeholder-gray-600 outline-none transition-colors"
+                                />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
                             {['all','critical','high','medium','info'].map(f => {
                                 const cnt = f === 'all' ? total : ((bk as any)[f] ?? 0)
                                 const on = filter === f
@@ -577,9 +675,13 @@ export default function ReportPage() {
                                     </button>
                                 )
                             })}
+                            </div>
                         </div>
                         <div className="space-y-2">
-                            {filtered.map((f, i) => <FindingCard key={`${f.id}-${i}`} finding={f} open={i === 0 && f.severity === 'critical'} />)}
+                            {filtered.map((f, i) => {
+                                const origIdx = findings.indexOf(f)
+                                return <FindingCard key={`${f.id}-${i}`} finding={f} open={i === 0 && f.severity === 'critical'} findingIndex={origIdx} scanId={params.id as string} />
+                            })}
                             {filtered.length === 0 && (
                                 <div className="text-center py-16 text-gray-600">
                                     <Shield size={48} className="mx-auto mb-4 opacity-20" />
@@ -781,37 +883,7 @@ export default function ReportPage() {
                                                     : 'bg-white/[0.04] border-white/5 rounded-tl-sm'
                                             }`}>
                                                 <div className="text-[12px] text-gray-300 leading-relaxed break-words chat-md">
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                                                        p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
-                                                        strong: ({children}) => <strong className="text-white font-semibold">{children}</strong>,
-                                                        em: ({children}) => <em className="text-purple-300">{children}</em>,
-                                                        h1: ({children}) => <h3 className="text-sm font-bold text-white mt-3 mb-1.5">{children}</h3>,
-                                                        h2: ({children}) => <h3 className="text-sm font-bold text-white mt-3 mb-1.5">{children}</h3>,
-                                                        h3: ({children}) => <h4 className="text-[13px] font-bold text-white mt-2.5 mb-1">{children}</h4>,
-                                                        ul: ({children}) => <ul className="list-disc list-outside ml-4 mb-2 space-y-0.5">{children}</ul>,
-                                                        ol: ({children}) => <ol className="list-decimal list-outside ml-4 mb-2 space-y-0.5">{children}</ol>,
-                                                        li: ({children}) => <li className="text-gray-300">{children}</li>,
-                                                        code: ({className, children, ...props}) => {
-                                                            const isBlock = className?.includes('language-')
-                                                            if (isBlock) {
-                                                                return (
-                                                                    <div className="my-2 rounded-lg overflow-hidden border border-white/10">
-                                                                        <div className="bg-white/[0.06] px-3 py-1 text-[9px] text-gray-500 font-mono border-b border-white/5">
-                                                                            {className?.replace('language-', '') || 'code'}
-                                                                        </div>
-                                                                        <pre className="bg-[#0d0d1a] p-3 overflow-x-auto"><code className="text-[11px] font-mono text-emerald-300 leading-relaxed">{children}</code></pre>
-                                                                    </div>
-                                                                )
-                                                            }
-                                                            return <code className="bg-white/10 text-purple-300 px-1.5 py-0.5 rounded text-[11px] font-mono" {...props}>{children}</code>
-                                                        },
-                                                        pre: ({children}) => <>{children}</>,
-                                                        blockquote: ({children}) => <blockquote className="border-l-2 border-yellow-500/50 pl-3 my-2 text-yellow-200/80 italic">{children}</blockquote>,
-                                                        a: ({href, children}) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-purple-400 underline hover:text-purple-300">{children}</a>,
-                                                        table: ({children}) => <div className="overflow-x-auto my-2"><table className="text-[10px] border-collapse w-full">{children}</table></div>,
-                                                        th: ({children}) => <th className="border border-white/10 bg-white/5 px-2 py-1 text-left text-gray-300 font-bold">{children}</th>,
-                                                        td: ({children}) => <td className="border border-white/10 px-2 py-1 text-gray-400">{children}</td>,
-                                                    }}>
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                                                         {msg.content}
                                                     </ReactMarkdown>
                                                 </div>
@@ -883,6 +955,21 @@ export default function ReportPage() {
                             </div>
                         </motion.aside>
                     </>
+                )}
+            </AnimatePresence>
+
+            {/* ═══════ TOAST ═══════ */}
+            <AnimatePresence>
+                {toast.show && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-2.5 bg-emerald-500/20 border border-emerald-500/40 backdrop-blur-xl rounded-xl text-emerald-300 text-xs font-bold flex items-center gap-2 shadow-2xl"
+                    >
+                        <CheckCircle size={14} /> {toast.msg}
+                    </motion.div>
                 )}
             </AnimatePresence>
         </div>

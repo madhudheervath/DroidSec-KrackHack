@@ -85,10 +85,10 @@ export default function CyberBackground() {
                     }
                 }
             }
-            requestAnimationFrame(animate)
+            rafId = requestAnimationFrame(animate)
         }
 
-        animate()
+        let rafId = requestAnimationFrame(animate)
 
         const handleResize = () => {
             width = canvas.width = window.innerWidth
@@ -96,7 +96,10 @@ export default function CyberBackground() {
         }
 
         window.addEventListener("resize", handleResize)
-        return () => window.removeEventListener("resize", handleResize)
+        return () => {
+            cancelAnimationFrame(rafId)
+            window.removeEventListener("resize", handleResize)
+        }
     }, [])
 
     return (
