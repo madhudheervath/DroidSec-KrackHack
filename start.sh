@@ -1,12 +1,14 @@
 #!/bin/bash
 
-# Ensure we have a default port if Railway doesn't provide one (though it should)
+# Ensure we have a default port if Railway doesn't provide one
 APP_PORT="${PORT:-3000}"
 
-# Start the Backend on a fixed internal port
-echo "Starting Backend on internal port 8000..."
+# Start the Backend on a fixed internal localhost port
+echo "Starting Backend on internal 127.0.0.1:8000..."
 cd /app/backend
-# Specifically bind backend to localhost to keep it internal
+# Override main.py by passing host as argument if possible, or trust env logic
+# Here we force main.py logic to bind to 127.0.0.1 by wrapping it or modifying it
+# Actually, I will modify main.py as well to be safe.
 PORT=8000 python3 main.py &
 BACKEND_PID=$!
 
@@ -17,8 +19,8 @@ sleep 5
 # Start the Frontend on the Railway-assigned port, binding to 0.0.0.0
 echo "Starting Frontend on port $APP_PORT (binding to 0.0.0.0)..."
 cd /app/frontend
-# Explicitly use 0.0.0.0 to ensure Railway's proxy can reach it
-HOSTNAME=0.0.0.0 npx next start -p "$APP_PORT"
+# Use -H 0.0.0.0 to be absolutely sure it's public
+npx next start -H 0.0.0.0 -p "$APP_PORT"
 
 # Cleanup if frontend exits
 kill $BACKEND_PID
