@@ -14,6 +14,7 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y \
     openjdk-17-jre-headless \
     curl \
+    unzip \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
@@ -25,9 +26,9 @@ WORKDIR /app
 COPY backend/ /app/backend/
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
-# Copy Tools
-COPY tools/ /app/tools/
-RUN chmod +x /app/tools/apktool /app/tools/jadx/bin/jadx
+# Setup Tools
+COPY setup_tools.sh /app/setup_tools.sh
+RUN chmod +x /app/setup_tools.sh && ./app/setup_tools.sh
 
 # Copy Built Frontend
 COPY --from=frontend-builder /app/frontend/.next /app/frontend/.next
