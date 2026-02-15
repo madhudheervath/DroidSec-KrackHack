@@ -2,35 +2,36 @@
 FROM node:18-slim AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install
+# Reduce memory usage and prevent timeouts
+RUN npm install --no-audit --no-fund
 COPY frontend/ ./
-# We need to set this if we use absolute URLs, but since we fixed api.ts to be relative, we are fine.
 RUN npm run build
 
-# Final Stage
-FROM python:3.10-slim
+# Final Stage - Start from Node slim to ensure stable frontend runtime
+FROM node:18-slim
 
-# Install system dependencies (Java 17, Node.js for Next.js runtime, and utilities)
-RUN apt-get update && apt-get install -y \
+# Install Python, Java 17, and utilities in a more robust way
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
     openjdk-17-jre-headless \
     curl \
     unzip \
-    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy Backend
+# Copy Backend and install requirements
+# Using pip3 specifically for the debian environment
 COPY backend/ /app/backend/
-RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+RUN pip3 install --no-cache-dir -r /app/backend/requirements.txt
 
-# Setup Tools
+# Setup Analysis Tools (apktool, jadx)
 COPY setup_tools.sh /app/setup_tools.sh
 RUN chmod +x /app/setup_tools.sh && ./app/setup_tools.sh
 
-# Copy Built Frontend
+# Copy Built Frontend from builder
 COPY --from=frontend-builder /app/frontend/.next /app/frontend/.next
 COPY --from=frontend-builder /app/frontend/public /app/frontend/public
 COPY --from=frontend-builder /app/frontend/package*.json /app/frontend/
@@ -38,14 +39,14 @@ COPY --from=frontend-builder /app/frontend/next.config.mjs /app/frontend/
 
 # Install only production dependencies for frontend
 WORKDIR /app/frontend
-RUN npm install --omit=dev
+RUN npm install --omit=dev --no-audit --no-fund
 
 WORKDIR /app
 
-# Create necessary directories
+# Create necessary architecture directories
 RUN mkdir -p /app/backend/uploads /app/backend/reports
 
-# Startup script to run both processes
+# Copy Startup script
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
@@ -53,4 +54,5 @@ RUN chmod +x /app/start.sh
 ENV PORT 3000
 EXPOSE 3000
 
+# Run the unified startup script
 CMD ["/app/start.sh"]
