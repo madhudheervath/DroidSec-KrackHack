@@ -17,6 +17,8 @@ import {
     ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
     PieChart, Pie
 } from 'recharts'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import NeonCard from '../../components/NeonCard'
 import CyberBackground from '../../components/CyberBackground'
 import { apiUrl } from '../../lib/api'
@@ -358,14 +360,6 @@ export default function ReportPage() {
             setTimeout(() => chatInputRef.current?.focus(), 100)
         }
     }, [chatInput, chatSending, params.id])
-
-    const QUICK_PROMPTS = [
-        { label: 'Summarize risks', prompt: 'Give me a concise summary of the top security risks in this app and their real-world impact.' },
-        { label: 'Critical findings', prompt: 'Explain all critical and high severity findings in detail with exploitation scenarios.' },
-        { label: 'Fix plan', prompt: 'Create a step-by-step remediation plan prioritized by risk and effort.' },
-        { label: 'Code review', prompt: 'Review the code evidence from the findings and suggest secure alternatives with code snippets.' },
-        { label: 'OWASP mapping', prompt: 'Map all findings to OWASP Mobile Top 10 categories and explain coverage gaps.' },
-    ]
 
     /* derived */
     const score      = report?.security_score?.score ?? 0
@@ -766,19 +760,9 @@ export default function ReportPage() {
                                                         Hi! I&apos;m your AI security assistant. I&apos;ve analyzed <strong className="text-white">{report?.apk_filename || 'this APK'}</strong> and found <strong className="text-white">{total} security findings</strong>.
                                                     </p>
                                                     <p className="text-[11px] text-gray-400 leading-relaxed mt-1.5">
-                                                        Ask me anything — vulnerability details, code fixes, exploitation scenarios, or OWASP mappings. Try a quick action below:
+                                                        Ask me anything — vulnerability details, code fixes, exploitation scenarios, or OWASP mappings.
                                                     </p>
                                                 </div>
-                                            </div>
-
-                                            {/* Quick action chips */}
-                                            <div className="flex flex-wrap gap-1.5 pl-9">
-                                                {QUICK_PROMPTS.map((qp, i) => (
-                                                    <button key={i} onClick={() => sendChat(qp.prompt)}
-                                                        className="px-2.5 py-1.5 bg-white/[0.04] hover:bg-purple-500/10 border border-white/8 hover:border-purple-500/30 rounded-lg text-[10px] text-gray-400 hover:text-purple-300 transition-all font-medium">
-                                                        {qp.label}
-                                                    </button>
-                                                ))}
                                             </div>
                                         </div>
                                     )}
@@ -796,8 +780,40 @@ export default function ReportPage() {
                                                     ? 'bg-purple-600/20 border-purple-500/20 rounded-tr-sm'
                                                     : 'bg-white/[0.04] border-white/5 rounded-tl-sm'
                                             }`}>
-                                                <div className="text-[11px] text-gray-300 leading-relaxed whitespace-pre-wrap break-words chat-content">
-                                                    {msg.content}
+                                                <div className="text-[12px] text-gray-300 leading-relaxed break-words chat-md">
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                                                        p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                                                        strong: ({children}) => <strong className="text-white font-semibold">{children}</strong>,
+                                                        em: ({children}) => <em className="text-purple-300">{children}</em>,
+                                                        h1: ({children}) => <h3 className="text-sm font-bold text-white mt-3 mb-1.5">{children}</h3>,
+                                                        h2: ({children}) => <h3 className="text-sm font-bold text-white mt-3 mb-1.5">{children}</h3>,
+                                                        h3: ({children}) => <h4 className="text-[13px] font-bold text-white mt-2.5 mb-1">{children}</h4>,
+                                                        ul: ({children}) => <ul className="list-disc list-outside ml-4 mb-2 space-y-0.5">{children}</ul>,
+                                                        ol: ({children}) => <ol className="list-decimal list-outside ml-4 mb-2 space-y-0.5">{children}</ol>,
+                                                        li: ({children}) => <li className="text-gray-300">{children}</li>,
+                                                        code: ({className, children, ...props}) => {
+                                                            const isBlock = className?.includes('language-')
+                                                            if (isBlock) {
+                                                                return (
+                                                                    <div className="my-2 rounded-lg overflow-hidden border border-white/10">
+                                                                        <div className="bg-white/[0.06] px-3 py-1 text-[9px] text-gray-500 font-mono border-b border-white/5">
+                                                                            {className?.replace('language-', '') || 'code'}
+                                                                        </div>
+                                                                        <pre className="bg-[#0d0d1a] p-3 overflow-x-auto"><code className="text-[11px] font-mono text-emerald-300 leading-relaxed">{children}</code></pre>
+                                                                    </div>
+                                                                )
+                                                            }
+                                                            return <code className="bg-white/10 text-purple-300 px-1.5 py-0.5 rounded text-[11px] font-mono" {...props}>{children}</code>
+                                                        },
+                                                        pre: ({children}) => <>{children}</>,
+                                                        blockquote: ({children}) => <blockquote className="border-l-2 border-yellow-500/50 pl-3 my-2 text-yellow-200/80 italic">{children}</blockquote>,
+                                                        a: ({href, children}) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-purple-400 underline hover:text-purple-300">{children}</a>,
+                                                        table: ({children}) => <div className="overflow-x-auto my-2"><table className="text-[10px] border-collapse w-full">{children}</table></div>,
+                                                        th: ({children}) => <th className="border border-white/10 bg-white/5 px-2 py-1 text-left text-gray-300 font-bold">{children}</th>,
+                                                        td: ({children}) => <td className="border border-white/10 px-2 py-1 text-gray-400">{children}</td>,
+                                                    }}>
+                                                        {msg.content}
+                                                    </ReactMarkdown>
                                                 </div>
                                             </div>
                                             {msg.role === 'user' && (
@@ -830,19 +846,6 @@ export default function ReportPage() {
                                     <div ref={chatEndRef} />
                                 </div>
 
-                                {/* Quick prompts after conversation started */}
-                                {chatMessages.length > 0 && !chatSending && (
-                                    <div className="px-4 pb-2">
-                                        <div className="flex flex-wrap gap-1">
-                                            {QUICK_PROMPTS.slice(0, 3).map((qp, i) => (
-                                                <button key={i} onClick={() => sendChat(qp.prompt)}
-                                                    className="px-2 py-1 bg-white/[0.03] hover:bg-purple-500/10 border border-white/5 hover:border-purple-500/20 rounded-md text-[9px] text-gray-500 hover:text-purple-300 transition-all">
-                                                    {qp.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </div>
 
                             {/* ── Chat Input ── */}

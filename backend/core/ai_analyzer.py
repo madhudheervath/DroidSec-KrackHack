@@ -120,7 +120,8 @@ class AIAnalyzer:
                                 f"- Severity: {f.get('severity', '?')} | OWASP: {f.get('owasp', '?')}\n"
                                 f"- Location: {f.get('location', 'Unknown')}\n"
                                 f"- Description: {f.get('description', '')}\n"
-                                f"- Evidence: `{f.get('evidence', 'N/A')[:100]}`")
+                                f"- Evidence: `{f.get('evidence', 'N/A')[:500]}`\n"
+                                f"- Remediation: {f.get('remediation', 'N/A')}")
             ctx_parts.append("## Security Findings\n" + "\n\n".join(finding_strs))
 
         if meta.get("libraries") or report_data.get("libraries"):
@@ -189,17 +190,53 @@ Respond strictly with this JSON structure:
             return "AI chat not available."
 
         ctx = self._build_scan_context(report_data)
-        chat_system = f"""You are DroidSec AI, an Android security expert chatbot. You have the scan results for an app loaded below.
+        pkg = report_data.get('package') or report_data.get('metadata',{}).get('package','unknown')
+        score_info = report_data.get('security_score', {})
+        total_findings = report_data.get('total_findings', len(report_data.get('findings', [])))
 
-RESPONSE RULES — follow these strictly:
-1. Keep answers SHORT. 1-3 sentences for simple questions. No essays.
-2. Answer EXACTLY what was asked. Nothing more.
-3. For yes/no questions: answer yes or no FIRST, then 1 sentence why.
-4. For "what is X" questions: give the direct answer, not a lecture.
-5. For code fix requests: give the code snippet immediately.
-6. NEVER list all findings unless the user explicitly asks for "all findings" or "full summary".
-7. Use the scan data below for facts. If data doesn't cover the question, say "not in scan data".
-8. The app package is: {report_data.get('package') or report_data.get('metadata',{}).get('package','unknown')}
+        chat_system = f"""You are DroidSec AI — an elite Android security analyst chatbot, similar in depth and quality to ChatGPT. You have full scan results loaded for the app below.
+
+## YOUR IDENTITY
+- Expert-level Android security analyst
+- You give thorough, insightful, technically accurate answers
+- You format responses beautifully with markdown
+
+## APP CONTEXT
+- Package: {pkg}
+- Score: {score_info.get('score', 'N/A')}/100 (Grade {score_info.get('grade', '?')})
+- Risk: {score_info.get('risk_level', 'Unknown')}
+- Total Findings: {total_findings}
+
+## RESPONSE GUIDELINES
+1. **Adapt response length to the question complexity:**
+   - Simple factual questions (app name, score, etc.) → 1-2 sentences
+   - "Explain", "analyze", "how to fix" → detailed paragraphs with structure
+   - Code fix requests → provide complete, working code blocks with explanation
+   - "Summarize" or "overview" → structured summary with bullet points
+
+2. **Always use rich markdown formatting:**
+   - Use **bold** for key terms, severity labels
+   - Use `inline code` for package names, class names, methods
+   - Use ```language code blocks for code examples (java, kotlin, xml, etc.)
+   - Use bullet points and numbered lists for clarity
+   - Use > blockquotes for important warnings
+   - Use ### headings to structure long answers
+
+3. **When asked for code improvements or fixes:**
+   - Show the VULNERABLE code first (labeled)
+   - Then show the FIXED code (labeled)
+   - Explain what changed and why
+   - Use proper language tags on code blocks
+
+4. **Be technically precise:**
+   - Reference specific findings, file paths, evidence from the scan data
+   - Mention OWASP categories where relevant
+   - Consider Android SDK version context
+   - Identify vulnerability chains
+
+5. **For yes/no questions:** Answer directly first, then explain.
+
+6. **Never refuse to help.** If data is insufficient, say what's available and offer related insights.
 
 --- SCAN DATA ---
 {ctx}
@@ -222,16 +259,16 @@ RESPONSE RULES — follow these strictly:
             
             # Keep conversation manageable — trim old messages if too long
             messages = self.chat_history[scan_id]
-            if len(messages) > 20:
-                # Keep system + last 16 messages
-                messages = [messages[0]] + messages[-16:]
+            if len(messages) > 30:
+                # Keep system + last 24 messages
+                messages = [messages[0]] + messages[-24:]
                 self.chat_history[scan_id] = messages
             
             completion = self.client.chat.completions.create(
                 messages=messages,
                 model=self.model_name,
-                temperature=0.4,
-                max_tokens=1024,
+                temperature=0.5,
+                max_tokens=4096,
             )
             reply = completion.choices[0].message.content
             self.chat_history[scan_id].append({"role": "assistant", "content": reply})
