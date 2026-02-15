@@ -14,25 +14,32 @@ export default function CyberBackground() {
         let width = (canvas.width = window.innerWidth)
         let height = (canvas.height = window.innerHeight)
 
+        const COLORS = [
+            { r: 0, g: 255, b: 157 },   // green
+            { r: 124, g: 92, b: 252 },   // purple
+            { r: 34, g: 211, b: 238 },   // cyan
+        ]
+
         class Particle {
             x: number
             y: number
             vx: number
             vy: number
             size: number
+            color: typeof COLORS[0]
 
             constructor() {
                 this.x = Math.random() * width
                 this.y = Math.random() * height
-                this.vx = (Math.random() - 0.5) * 0.5
-                this.vy = (Math.random() - 0.5) * 0.5
-                this.size = Math.random() * 2
+                this.vx = (Math.random() - 0.5) * 0.4
+                this.vy = (Math.random() - 0.5) * 0.4
+                this.size = Math.random() * 1.8 + 0.2
+                this.color = COLORS[Math.floor(Math.random() * COLORS.length)]
             }
 
             update() {
                 this.x += this.vx
                 this.y += this.vy
-
                 if (this.x < 0 || this.x > width) this.vx *= -1
                 if (this.y < 0 || this.y > height) this.vy *= -1
             }
@@ -41,13 +48,13 @@ export default function CyberBackground() {
                 if (!ctx) return
                 ctx.beginPath()
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-                ctx.fillStyle = "rgba(0, 255, 157, 0.5)"
+                ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 0.5)`
                 ctx.fill()
             }
         }
 
         const particles: Particle[] = []
-        const particleCount = Math.floor((width * height) / 15000)
+        const particleCount = Math.min(120, Math.floor((width * height) / 18000))
 
         for (let i = 0; i < particleCount; i++) {
             particles.push(new Particle())
@@ -55,10 +62,6 @@ export default function CyberBackground() {
 
         const animate = () => {
             ctx.clearRect(0, 0, width, height)
-
-            // Draw connections
-            ctx.strokeStyle = "rgba(0, 255, 157, 0.05)"
-            ctx.lineWidth = 0.5
 
             for (let i = 0; i < particles.length; i++) {
                 const p1 = particles[i]
@@ -71,7 +74,10 @@ export default function CyberBackground() {
                     const dy = p1.y - p2.y
                     const dist = Math.sqrt(dx * dx + dy * dy)
 
-                    if (dist < 100) {
+                    if (dist < 120) {
+                        const alpha = (1 - dist / 120) * 0.06
+                        ctx.strokeStyle = `rgba(${(p1.color.r + p2.color.r) >> 1}, ${(p1.color.g + p2.color.g) >> 1}, ${(p1.color.b + p2.color.b) >> 1}, ${alpha})`
+                        ctx.lineWidth = 0.5
                         ctx.beginPath()
                         ctx.moveTo(p1.x, p1.y)
                         ctx.lineTo(p2.x, p2.y)
@@ -94,9 +100,25 @@ export default function CyberBackground() {
     }, [])
 
     return (
-        <canvas
-            ref={canvasRef}
-            className="fixed top-0 left-0 w-full h-full -z-10 bg-black pointer-events-none"
-        />
+        <>
+            {/* Gradient orbs */}
+            <div className="fixed inset-0 -z-20 overflow-hidden pointer-events-none">
+                <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-purple-600/[0.04] blur-[100px]"
+                     style={{ animation: 'orb-float-1 20s ease-in-out infinite' }} />
+                <div className="absolute top-1/2 -right-32 w-[400px] h-[400px] rounded-full bg-cyan-500/[0.03] blur-[100px]"
+                     style={{ animation: 'orb-float-2 25s ease-in-out infinite' }} />
+                <div className="absolute -bottom-40 left-1/3 w-[450px] h-[450px] rounded-full bg-emerald-500/[0.03] blur-[100px]"
+                     style={{ animation: 'orb-float-3 22s ease-in-out infinite' }} />
+            </div>
+
+            {/* Grid pattern */}
+            <div className="fixed inset-0 -z-15 bg-grid pointer-events-none" />
+
+            {/* Particle canvas */}
+            <canvas
+                ref={canvasRef}
+                className="fixed top-0 left-0 w-full h-full -z-10 pointer-events-none"
+            />
+        </>
     )
 }

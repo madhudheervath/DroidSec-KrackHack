@@ -82,3 +82,85 @@ body {
 .grade-C { color: var(--medium); }
 .grade-D { color: var(--high); }
 .grade-F { color: var(--critical); }
+
+/* Floating AI button pulse */
+@keyframes float-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(124, 92, 252, 0.4), 0 4px 15px rgba(0,0,0,0.3); }
+  50% { box-shadow: 0 0 40px rgba(124, 92, 252, 0.65), 0 4px 25px rgba(0,0,0,0.4); }
+}
+.animate-float-pulse {
+  animation: float-pulse 2.5s ease-in-out infinite;
+}
+
+/* AI drawer scrollbar */
+.ai-drawer::-webkit-scrollbar { width: 4px; }
+.ai-drawer::-webkit-scrollbar-track { background: transparent; }
+.ai-drawer::-webkit-scrollbar-thumb { background: rgba(124, 92, 252, 0.3); border-radius: 2px; }
+
+/* Chat content code blocks */
+.chat-content code {
+  background: rgba(124, 92, 252, 0.1);
+  border: 1px solid rgba(124, 92, 252, 0.2);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+}
+.chat-content pre {
+  background: rgba(10, 10, 20, 0.8);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 6px 0;
+  overflow-x: auto;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.chat-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+.chat-content strong { color: #e4e4ef; }
+.chat-content ul, .chat-content ol {
+  padding-left: 16px;
+  margin: 4px 0;
+}
+.chat-content li { margin: 2px 0; }
+.chat-content h1, .chat-content h2, .chat-content h3 {
+  font-weight: 800;
+  color: #e4e4ef;
+  margin: 8px 0 4px;
+}
+
+/* Glass card hover lift */
+.glass-card {
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+.glass-card:hover {
+  border-color: rgba(124, 92, 252, 0.12);
+}
+
+/* Background gradient orbs */
+@keyframes orb-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, -60px) scale(1.05); }
+  66% { transform: translate(-30px, 30px) scale(0.95); }
+}
+@keyframes orb-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-50px, 40px) scale(1.08); }
+  66% { transform: translate(25px, -45px) scale(0.92); }
+}
+@keyframes orb-float-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(35px, 50px) scale(1.04); }
+}
+
+/* Subtle grid pattern */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(124, 92, 252, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 92, 252, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}

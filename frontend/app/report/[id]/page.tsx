@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,7 +9,8 @@ import {
     FileText, ArrowLeft, Download, Code, ChevronDown,
     Bug, Lock, Wifi, Eye, Smartphone, Database, Key, Layers,
     BarChart3, Activity, Target, Zap, Clock, Package, FileCode,
-    CheckCircle, XCircle, AlertCircle, TrendingDown, Brain
+    CheckCircle, XCircle, AlertCircle, TrendingDown, Brain, X, Sparkles,
+    Send, MessageCircle, CornerDownLeft, Loader2
 } from 'lucide-react'
 import {
     RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -90,6 +91,12 @@ interface AIAnalysis {
     available?: boolean
     error?: string
     provider?: string
+}
+
+interface ChatMessage {
+    role: 'user' | 'assistant' | 'system'
+    content: string
+    timestamp: number
 }
 
 /* ------------------------------------------------------------------ */
@@ -257,9 +264,15 @@ export default function ReportPage() {
     const [report, setReport]       = useState<Report | null>(null)
     const [loading, setLoading]     = useState(true)
     const [filter, setFilter]       = useState('all')
-    const [tab, setTab]             = useState<'findings' | 'owasp' | 'ai'>('findings')
+    const [tab, setTab]             = useState<'findings' | 'owasp'>('findings')
     const [ai, setAi]               = useState<AIAnalysis | null>(null)
     const [aiLoading, setAiLoading] = useState(false)
+    const [aiOpen, setAiOpen]       = useState(false)
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+    const [chatInput, setChatInput] = useState('')
+    const [chatSending, setChatSending] = useState(false)
+    const chatEndRef = useRef<HTMLDivElement>(null)
+    const chatInputRef = useRef<HTMLTextAreaElement>(null)
 
     /* fetch report */
     useEffect(() => {
@@ -276,7 +289,7 @@ export default function ReportPage() {
 
     /* lazy AI fetch */
     useEffect(() => {
-        if (tab !== 'ai' || ai || aiLoading || !report) return
+        if (!aiOpen || ai || aiLoading || !report) return
         ;(async () => {
             setAiLoading(true)
             try {
@@ -285,7 +298,61 @@ export default function ReportPage() {
             } catch { setAi({ error: 'Failed to reach AI endpoint', available: false }) }
             finally { setAiLoading(false) }
         })()
-    }, [tab, ai, aiLoading, report, params.id])
+    }, [aiOpen, ai, aiLoading, report, params.id])
+
+    /* auto-scroll chat */
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [chatMessages, chatSending])
+
+    /* focus input when drawer opens */
+    useEffect(() => {
+        if (aiOpen && !aiLoading && !chatSending) {
+            setTimeout(() => chatInputRef.current?.focus(), 300)
+        }
+    }, [aiOpen, aiLoading, chatSending])
+
+    /* send chat message */
+    const sendChat = useCallback(async (msg?: string) => {
+        const text = (msg ?? chatInput).trim()
+        if (!text || chatSending || !params.id) return
+
+        setChatInput('')
+        setChatMessages(prev => [...prev, { role: 'user', content: text, timestamp: Date.now() }])
+        setChatSending(true)
+
+        try {
+            const res = await fetch(apiUrl('/api/ai/chat'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text, scan_id: params.id }),
+            })
+            if (!res.ok) throw new Error('Chat failed')
+            const data = await res.json()
+            setChatMessages(prev => [...prev, {
+                role: 'assistant',
+                content: data.response || 'No response received.',
+                timestamp: Date.now()
+            }])
+        } catch {
+            setChatMessages(prev => [...prev, {
+                role: 'assistant',
+                content: 'Sorry, I couldn\'t process that request. Please check if the AI service is configured.',
+                timestamp: Date.now()
+            }])
+        } finally {
+            setChatSending(false)
+            setTimeout(() => chatInputRef.current?.focus(), 100)
+        }
+    }, [chatInput, chatSending, params.id])
+
+    const QUICK_PROMPTS = [
+        { label: 'Summarize risks', prompt: 'Give me a concise summary of the top security risks in this app and their real-world impact.' },
+        { label: 'Critical findings', prompt: 'Explain all critical and high severity findings in detail with exploitation scenarios.' },
+        { label: 'Fix plan', prompt: 'Create a step-by-step remediation plan prioritized by risk and effort.' },
+        { label: 'Code review', prompt: 'Review the code evidence from the findings and suggest secure alternatives with code snippets.' },
+        { label: 'OWASP mapping', prompt: 'Map all findings to OWASP Mobile Top 10 categories and explain coverage gaps.' },
+    ]
 
     /* derived */
     const score      = report?.security_score?.score ?? 0
@@ -335,7 +402,7 @@ export default function ReportPage() {
     const gs = gradeStyle(grade)
 
     return (
-        <div className="min-h-screen bg-[#0a0a12] text-white selection:bg-purple-500/30 pb-20">
+        <div className="min-h-screen bg-[#0a0a12] text-white selection:bg-purple-500/30 pb-20 overflow-x-hidden">
             <CyberBackground />
 
             {/* NAV */}
@@ -354,24 +421,24 @@ export default function ReportPage() {
                 </div>
             </nav>
 
-            <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+            <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
 
                 {/* ══════════ HERO ══════════ */}
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 md:p-8">
-                    <div className="flex flex-col md:flex-row items-center gap-8">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 sm:p-6 md:p-8">
+                    <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8">
                         <ScoreRing score={score} grade={grade} />
 
-                        <div className="flex-1 text-center md:text-left space-y-3">
+                        <div className="flex-1 text-center md:text-left space-y-3 min-w-0">
                             <div>
-                                <h1 className="text-xl md:text-2xl font-black tracking-tight">{report.apk_filename || report.package || 'Unknown APK'}</h1>
-                                <p className="text-sm text-gray-500 font-mono">{report.package}</p>
+                                <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight truncate">{report.apk_filename || report.package || 'Unknown APK'}</h1>
+                                <p className="text-xs sm:text-sm text-gray-500 font-mono truncate">{report.package}</p>
                             </div>
-                            <p className="text-xs text-gray-400 leading-relaxed max-w-2xl">{report.security_score?.summary}</p>
-                            <div className="flex flex-wrap justify-center md:justify-start gap-3 pt-2">
-                                <span className={`text-xs font-bold px-3 py-1 rounded-full border ${gs.ring} ${gs.text} bg-white/5`}>
+                            <p className="text-xs text-gray-400 leading-relaxed max-w-2xl line-clamp-3">{report.security_score?.summary}</p>
+                            <div className="flex flex-wrap justify-center md:justify-start gap-2 sm:gap-3 pt-2">
+                                <span className={`text-[11px] sm:text-xs font-bold px-3 py-1 rounded-full border ${gs.ring} ${gs.text} bg-white/5`}>
                                     {report.security_score?.risk_level} Risk
                                 </span>
-                                <span className="text-xs text-gray-500 px-3 py-1 rounded-full border border-white/10 bg-white/5">
+                                <span className="text-[11px] sm:text-xs text-gray-500 px-3 py-1 rounded-full border border-white/10 bg-white/5">
                                     <Clock size={10} className="inline mr-1 -mt-0.5" />{ts}
                                 </span>
                                 {report.analysis_mode && (
@@ -442,7 +509,6 @@ export default function ReportPage() {
                     {([
                         { k: 'findings' as const, l: 'Findings', ic: <Bug size={14} />, n: total },
                         { k: 'owasp'    as const, l: 'OWASP Top 10', ic: <Target size={14} /> },
-                        { k: 'ai'       as const, l: 'AI Analysis', ic: <Brain size={14} /> },
                     ]).map(t => (
                         <button key={t.k} onClick={() => setTab(t.k)}
                             className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all ${tab === t.k ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>
@@ -536,123 +602,238 @@ export default function ReportPage() {
                     </motion.div>
                 )}
 
-                {/* ══════════ TAB: AI ══════════ */}
-                {tab === 'ai' && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-
-                        {aiLoading && (
-                            <div className="glass-card p-12 flex flex-col items-center gap-4">
-                                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: 'linear' }}>
-                                    <Brain size={40} className="text-purple-400" />
-                                </motion.div>
-                                <p className="text-sm text-gray-400">AI is analyzing the security report…</p>
-                                <p className="text-[10px] text-gray-600">This may take 10-30 seconds</p>
-                            </div>
-                        )}
-
-                        {ai?.error && !ai.available && (
-                            <div className="glass-card p-8 text-center space-y-3">
-                                <Brain size={40} className="mx-auto text-gray-600" />
-                                <p className="text-sm text-gray-400">AI analysis is not available</p>
-                                <p className="text-xs text-gray-600">{ai.error}</p>
-                                <p className="text-[10px] text-gray-700">Set GROQ_API_KEY or GEMINI_API_KEY to enable AI features.</p>
-                            </div>
-                        )}
-
-                        {ai && !ai.error && (<>
-                            {ai.executive_summary && (
-                                <div className="glass-card p-6">
-                                    <h3 className="text-sm font-black text-purple-400 mb-3 flex items-center gap-2">
-                                        <Brain size={16} /> AI Executive Summary
-                                        {ai.provider && <span className="text-[10px] text-gray-600 font-normal ml-2">powered by {ai.provider}</span>}
-                                    </h3>
-                                    <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap">{ai.executive_summary}</p>
-                                </div>
-                            )}
-
-                            {ai.threat_model && (
-                                <div className="glass-card p-6">
-                                    <h3 className="text-sm font-black text-red-400 mb-4 flex items-center gap-2"><Target size={16} /> Threat Model</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">Attack Vectors</p>
-                                            <ul className="space-y-1">{ai.threat_model.attack_vectors?.map((v, i) => (
-                                                <li key={i} className="text-xs text-gray-400 flex items-start gap-1.5"><Zap size={10} className="text-red-400 mt-0.5 shrink-0" />{v}</li>
-                                            ))}</ul>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">Threat Actors</p>
-                                            <ul className="space-y-1">{ai.threat_model.threat_actors?.map((a, i) => (
-                                                <li key={i} className="text-xs text-gray-400 flex items-start gap-1.5"><AlertTriangle size={10} className="text-orange-400 mt-0.5 shrink-0" />{a}</li>
-                                            ))}</ul>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">Impact Assessment</p>
-                                            <p className="text-xs text-gray-400 leading-relaxed">{ai.threat_model.impact_assessment}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {(ai.critical_chains?.length ?? 0) > 0 && (
-                                <div className="glass-card p-6">
-                                    <h3 className="text-sm font-black text-orange-400 mb-4 flex items-center gap-2"><Activity size={16} /> Vulnerability Chains</h3>
-                                    <div className="space-y-3">
-                                        {ai.critical_chains!.map((ch, i) => (
-                                            <div key={i} className="bg-white/[0.02] rounded-lg p-4 border border-white/5">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className="text-xs font-black text-white">{ch.name}</span>
-                                                    <span className="text-[10px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">{ch.risk}</span>
-                                                    <span className="text-[10px] text-gray-500">{ch.exploit_difficulty}</span>
-                                                </div>
-                                                <p className="text-xs text-gray-400">{ch.chain}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {(ai.prioritized_fixes?.length ?? 0) > 0 && (
-                                <div className="glass-card p-6">
-                                    <h3 className="text-sm font-black text-emerald-400 mb-4 flex items-center gap-2"><TrendingDown size={16} /> Prioritized Fix Plan</h3>
-                                    <div className="space-y-3">
-                                        {ai.prioritized_fixes!.map((fx, i) => (
-                                            <div key={i} className="flex items-start gap-3 bg-white/[0.02] rounded-lg p-4 border border-white/5">
-                                                <span className="text-lg font-black text-emerald-400 bg-emerald-500/10 w-8 h-8 rounded-lg flex items-center justify-center shrink-0">{fx.priority}</span>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-bold text-white mb-1">{fx.finding}</p>
-                                                    <p className="text-xs text-gray-500 mb-2">{fx.reason}</p>
-                                                    <span className="text-[10px] text-gray-600 bg-white/5 px-1.5 py-0.5 rounded">Effort: {fx.effort}</span>
-                                                    {fx.code_fix && <pre className="mt-2 bg-[#0d0d1a] rounded p-2 text-[10px] text-gray-400 font-mono overflow-x-auto whitespace-pre-wrap">{fx.code_fix}</pre>}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {(ai.security_recommendations?.length ?? 0) > 0 && (
-                                <div className="glass-card p-6">
-                                    <h3 className="text-sm font-black text-cyan-400 mb-4 flex items-center gap-2"><ShieldCheck size={16} /> Security Recommendations</h3>
-                                    <ul className="space-y-2">
-                                        {ai.security_recommendations!.map((r, i) => (
-                                            <li key={i} className="text-xs text-gray-400 flex items-start gap-2"><CheckCircle size={12} className="text-cyan-400 mt-0.5 shrink-0" />{r}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {ai.compliance_notes && (
-                                <div className="glass-card p-6">
-                                    <h3 className="text-sm font-black text-yellow-400 mb-3 flex items-center gap-2"><FileText size={16} /> Compliance Notes</h3>
-                                    <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap">{ai.compliance_notes}</p>
-                                </div>
-                            )}
-                        </>)}
-                    </motion.div>
-                )}
-
             </main>
+
+            {/* ═══════ FLOATING AI CHAT BUTTON ═══════ */}
+            {!aiOpen && (
+                <motion.button
+                    onClick={() => setAiOpen(true)}
+                    className="fixed bottom-6 right-6 z-40 group"
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.92 }}
+                    title="AI Security Chat"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', damping: 15 }}
+                >
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 via-indigo-600 to-purple-700 text-white shadow-xl flex items-center justify-center animate-float-pulse relative">
+                        <MessageCircle size={24} />
+                        <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-green-400 border-2 border-[#0a0a12]" />
+                        </span>
+                    </div>
+                    <span className="absolute bottom-full right-0 mb-2 px-2.5 py-1 bg-white/10 backdrop-blur-xl border border-white/10 rounded-lg text-[10px] text-gray-300 font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Ask AI about this scan
+                    </span>
+                </motion.button>
+            )}
+
+            {/* ═══════ AI CHAT DRAWER ═══════ */}
+            <AnimatePresence>
+                {aiOpen && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 lg:hidden"
+                            onClick={() => setAiOpen(false)}
+                        />
+                        <motion.aside
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+                            className="fixed right-0 top-0 h-full w-full sm:w-[420px] lg:w-[440px] bg-[#0c0c18]/98 backdrop-blur-2xl border-l border-white/10 z-50 flex flex-col shadow-2xl shadow-purple-900/20"
+                        >
+                            {/* ── Header ── */}
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-500/20 to-indigo-500/20">
+                                        <Brain size={18} className="text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm font-black text-white">DroidSec AI</h2>
+                                        <p className="text-[9px] text-gray-500">{ai?.provider ? `powered by ${ai.provider}` : 'Security Assistant'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    {chatMessages.length > 0 && (
+                                        <button onClick={() => setChatMessages([])}
+                                            className="px-2 py-1 rounded text-[10px] text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors font-bold">
+                                            Clear
+                                        </button>
+                                    )}
+                                    <button onClick={() => setAiOpen(false)}
+                                        className="p-1.5 rounded-lg hover:bg-white/10 text-gray-500 hover:text-white transition-colors">
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* ── Chat Body ── */}
+                            <div className="flex-1 overflow-y-auto ai-drawer">
+                                <div className="p-4 space-y-3">
+
+                                    {/* Deep analysis loading */}
+                                    {aiLoading && (
+                                        <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: 'linear' }}>
+                                                <Brain size={32} className="text-purple-400" />
+                                            </motion.div>
+                                            <p className="text-xs text-gray-400">Loading AI analysis…</p>
+                                        </div>
+                                    )}
+
+                                    {/* AI not available error */}
+                                    {ai?.error && !ai.available && (
+                                        <div className="text-center py-8 space-y-2">
+                                            <Brain size={28} className="mx-auto text-gray-600" />
+                                            <p className="text-xs text-gray-400">AI unavailable</p>
+                                            <p className="text-[10px] text-gray-600">{ai.error}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Deep analysis summary card (collapsed) */}
+                                    {ai && !ai.error && ai.executive_summary && chatMessages.length === 0 && (
+                                        <div className="bg-purple-500/[0.05] rounded-xl p-3.5 border border-purple-500/20">
+                                            <div className="flex items-center gap-1.5 mb-2">
+                                                <Sparkles size={12} className="text-purple-400" />
+                                                <span className="text-[10px] font-black text-purple-400 uppercase tracking-wider">AI Analysis Summary</span>
+                                            </div>
+                                            <p className="text-[11px] text-gray-300 leading-relaxed line-clamp-4">{ai.executive_summary}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Welcome message when no chat yet */}
+                                    {chatMessages.length === 0 && !aiLoading && (
+                                        <div className="space-y-4 pt-2">
+                                            <div className="flex gap-2.5">
+                                                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <Brain size={14} className="text-white" />
+                                                </div>
+                                                <div className="bg-white/[0.04] rounded-2xl rounded-tl-sm px-3.5 py-2.5 border border-white/5 max-w-[85%]">
+                                                    <p className="text-[11px] text-gray-300 leading-relaxed">
+                                                        Hi! I&apos;m your AI security assistant. I&apos;ve analyzed <strong className="text-white">{report?.apk_filename || 'this APK'}</strong> and found <strong className="text-white">{total} security findings</strong>.
+                                                    </p>
+                                                    <p className="text-[11px] text-gray-400 leading-relaxed mt-1.5">
+                                                        Ask me anything — vulnerability details, code fixes, exploitation scenarios, or OWASP mappings. Try a quick action below:
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Quick action chips */}
+                                            <div className="flex flex-wrap gap-1.5 pl-9">
+                                                {QUICK_PROMPTS.map((qp, i) => (
+                                                    <button key={i} onClick={() => sendChat(qp.prompt)}
+                                                        className="px-2.5 py-1.5 bg-white/[0.04] hover:bg-purple-500/10 border border-white/8 hover:border-purple-500/30 rounded-lg text-[10px] text-gray-400 hover:text-purple-300 transition-all font-medium">
+                                                        {qp.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Chat messages */}
+                                    {chatMessages.map((msg, i) => (
+                                        <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            {msg.role === 'assistant' && (
+                                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <Brain size={12} className="text-white" />
+                                                </div>
+                                            )}
+                                            <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 border ${
+                                                msg.role === 'user'
+                                                    ? 'bg-purple-600/20 border-purple-500/20 rounded-tr-sm'
+                                                    : 'bg-white/[0.04] border-white/5 rounded-tl-sm'
+                                            }`}>
+                                                <div className="text-[11px] text-gray-300 leading-relaxed whitespace-pre-wrap break-words chat-content">
+                                                    {msg.content}
+                                                </div>
+                                            </div>
+                                            {msg.role === 'user' && (
+                                                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <span className="text-[10px] font-bold text-gray-400">You</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+
+                                    {/* Typing indicator */}
+                                    {chatSending && (
+                                        <div className="flex gap-2.5">
+                                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                                                <Brain size={12} className="text-white" />
+                                            </div>
+                                            <div className="bg-white/[0.04] rounded-2xl rounded-tl-sm px-4 py-3 border border-white/5">
+                                                <div className="flex gap-1">
+                                                    {[0,1,2].map(i => (
+                                                        <motion.div key={i} className="w-1.5 h-1.5 bg-purple-400 rounded-full"
+                                                            animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+                                                            transition={{ repeat: Infinity, duration: 1, delay: i * 0.15 }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div ref={chatEndRef} />
+                                </div>
+
+                                {/* Quick prompts after conversation started */}
+                                {chatMessages.length > 0 && !chatSending && (
+                                    <div className="px-4 pb-2">
+                                        <div className="flex flex-wrap gap-1">
+                                            {QUICK_PROMPTS.slice(0, 3).map((qp, i) => (
+                                                <button key={i} onClick={() => sendChat(qp.prompt)}
+                                                    className="px-2 py-1 bg-white/[0.03] hover:bg-purple-500/10 border border-white/5 hover:border-purple-500/20 rounded-md text-[9px] text-gray-500 hover:text-purple-300 transition-all">
+                                                    {qp.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── Chat Input ── */}
+                            <div className="shrink-0 border-t border-white/10 p-3 bg-[#0a0a14]/80">
+                                <div className="flex gap-2 items-end">
+                                    <div className="flex-1 relative">
+                                        <textarea
+                                            ref={chatInputRef}
+                                            value={chatInput}
+                                            onChange={(e) => setChatInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault()
+                                                    sendChat()
+                                                }
+                                            }}
+                                            placeholder="Ask about vulnerabilities, code fixes…"
+                                            rows={1}
+                                            className="w-full bg-white/[0.04] border border-white/10 focus:border-purple-500/40 rounded-xl px-3.5 py-2.5 text-[12px] text-gray-200 placeholder-gray-600 outline-none resize-none transition-colors"
+                                            style={{ maxHeight: '100px' }}
+                                            disabled={chatSending}
+                                        />
+                                        <div className="absolute right-2 bottom-1.5 text-[8px] text-gray-700">
+                                            <CornerDownLeft size={10} className="inline mr-0.5" />enter
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => sendChat()}
+                                        disabled={!chatInput.trim() || chatSending}
+                                        className="w-9 h-9 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-white/5 disabled:text-gray-700 text-white flex items-center justify-center transition-colors shrink-0"
+                                    >
+                                        {chatSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.aside>
+                    </>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

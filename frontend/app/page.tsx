@@ -36,7 +36,7 @@ export default function Home() {
         {/* Footer */}
         <footer className="mt-24 text-center text-gray-600 font-mono text-xs md:text-sm">
           <p className="tracking-widest mb-2">SYSTEM STATUS: <span className="text-green-500 animate-pulse">ONLINE</span> • SECURE CONNECTION ESTABLISHED</p>
-          <p className="opacity-50">POWERED BY GEMINI 1.5 PRO & JADX DECOMPILER</p>
+          <p className="opacity-50">POWERED BY GROQ AI & JADX DECOMPILER</p>
         </footer>
       </div>
 
