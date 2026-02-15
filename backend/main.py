@@ -418,7 +418,6 @@ async def scan_apk(file: UploadFile = File(...)):
         raise HTTPException(500, f"Failed to save file: {e}")
 
     _update_scan_state(scan_id, **{
-        "scan_id": scan_id,
         "name": file.filename,
         "queued_at": datetime.utcnow().isoformat(),
         "status": "queued",
