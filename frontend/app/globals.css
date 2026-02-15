@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #0a0a12;
+  --bg-surface: #12121e;
+  --bg-surface2: #1a1a2e;
+  --surface2: #1a1a2e;
+  --border: #252540;
+  --text: #e4e4ef;
+  --text-muted: #7878a0;
+  --critical: #ff4757;
+  --high: #ff8c42;
+  --medium: #ffd166;
+  --info: #6ec6ff;
+  --accent: #7c5cfc;
+  --accent-glow: rgba(124, 92, 252, 0.3);
+  --success: #2ed573;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+body {
+  background: var(--bg-primary);
+}
+
+/* Glassmorphism card */
+.glass-card {
+  background: rgba(18, 18, 30, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+/* Glow effect */
+.glow-accent {
+  box-shadow: 0 0 20px var(--accent-glow), 0 0 60px rgba(124, 92, 252, 0.1);
+}
+
+/* Severity colors */
+.sev-critical { color: var(--critical); }
+.sev-high { color: var(--high); }
+.sev-medium { color: var(--medium); }
+.sev-info { color: var(--info); }
+
+.bg-sev-critical { background: rgba(255, 71, 87, 0.12); border: 1px solid rgba(255, 71, 87, 0.25); }
+.bg-sev-high { background: rgba(255, 140, 66, 0.12); border: 1px solid rgba(255, 140, 66, 0.25); }
+.bg-sev-medium { background: rgba(255, 209, 102, 0.12); border: 1px solid rgba(255, 209, 102, 0.25); }
+.bg-sev-info { background: rgba(110, 198, 255, 0.12); border: 1px solid rgba(110, 198, 255, 0.25); }
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px var(--accent-glow); }
+  50% { box-shadow: 0 0 40px var(--accent-glow), 0 0 80px rgba(124, 92, 252, 0.15); }
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Grade colors */
+.grade-A { color: var(--success); }
+.grade-B { color: var(--info); }
+.grade-C { color: var(--medium); }
+.grade-D { color: var(--high); }
+.grade-F { color: var(--critical); }

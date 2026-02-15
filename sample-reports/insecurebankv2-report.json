@@ -1,0 +1,537 @@
+{
+  "tool": "DroidSec",
+  "version": "1.0.0",
+  "timestamp": "2026-02-14T13:25:20.302179",
+  "package": "com.android.insecurebankv2",
+  "security_score": {
+    "score": 24,
+    "grade": "F",
+    "risk_level": "Critical",
+    "summary": "DroidSec identified 53 security findings (2 critical, 25 high, 11 medium severity), resulting in a security score of 24/100 (Grade F). This application has severe security issues and should NOT be released without remediation."
+  },
+  "severity_breakdown": {
+    "critical": 2,
+    "high": 25,
+    "medium": 11,
+    "info": 15
+  },
+  "total_findings": 53,
+  "owasp_coverage": {
+    "M1": {
+      "name": "Improper Credential Usage",
+      "count": 21,
+      "max_severity": "critical"
+    },
+    "M2": {
+      "name": "Inadequate Supply Chain Security",
+      "count": 0,
+      "max_severity": "none"
+    },
+    "M3": {
+      "name": "Insecure Authentication/Authorization",
+      "count": 11,
+      "max_severity": "info"
+    },
+    "M4": {
+      "name": "Insufficient Input/Output Validation",
+      "count": 1,
+      "max_severity": "high"
+    },
+    "M5": {
+      "name": "Insecure Communication",
+      "count": 3,
+      "max_severity": "medium"
+    },
+    "M6": {
+      "name": "Inadequate Privacy Controls",
+      "count": 1,
+      "max_severity": "info"
+    },
+    "M7": {
+      "name": "Insufficient Binary Protections",
+      "count": 3,
+      "max_severity": "critical"
+    },
+    "M8": {
+      "name": "Security Misconfiguration",
+      "count": 8,
+      "max_severity": "high"
+    },
+    "M9": {
+      "name": "Insecure Data Storage",
+      "count": 5,
+      "max_severity": "high"
+    },
+    "M10": {
+      "name": "Insufficient Cryptography",
+      "count": 0,
+      "max_severity": "none"
+    }
+  },
+  "findings": [
+    {
+      "id": "MAN002",
+      "name": "Application is Debuggable",
+      "severity": "critical",
+      "confidence": "high",
+      "owasp": "M7",
+      "location": "AndroidManifest.xml \u2192 <application>",
+      "evidence": "android:debuggable=\"true\"",
+      "description": "The application is set as debuggable. Attackers can attach a debugger, inspect memory, and modify runtime behavior.",
+      "remediation": "Set android:debuggable='false' in release builds. Ensure build.gradle sets debuggable=false for release."
+    },
+    {
+      "id": "SEC006",
+      "name": "Hardcoded Password",
+      "severity": "critical",
+      "confidence": "medium",
+      "owasp": "M1",
+      "location": "com/android/insecurebankv2/ChangePassword.java:70",
+      "file": "com/android/insecurebankv2/ChangePassword.java",
+      "line": 70,
+      "evidence": "password=\" + this.uname);\n        this.textView_Username = (TextView) findViewById(R.id.textView_Username);\n        this.textView_Username.setText(this.uname);\n        this.changePassword_button = (Bu",
+      "context": "        Intent intent = getIntent();\n        this.uname = intent.getStringExtra(\"uname\");\n        System.out.println(\"newpassword=\" + this.uname);\n        this.textView_Username = (TextView) findViewById(R.id.textView_Username);\n        this.textView_Username.setText(this.uname);",
+      "description": "Hardcoded password found in source code. Easily extractable by decompiling the APK.",
+      "remediation": "Never hardcode passwords. Use Android Keystore for storing secrets. Implement proper authentication flows."
+    },
+    {
+      "id": "ADV006",
+      "name": "Exported ContentProvider With Weak Permission Model",
+      "severity": "high",
+      "confidence": "medium",
+      "owasp": "M8",
+      "location": "AndroidManifest.xml \u2192 <provider android:name=\"com.android.insecurebankv2.TrackUserContentProvider\">",
+      "evidence": "android:exported=\"true\" (or implied via intent-filter) with no permission requirement",
+      "description": "Provider 'com.android.insecurebankv2.TrackUserContentProvider' is exported without android:permission/readPermission/writePermission. This can expose app data over content:// URIs to other apps. No grant-uri-permission scoping was detected.",
+      "remediation": "Set android:exported='false' unless cross-app sharing is required. If sharing is required, enforce readPermission/writePermission (prefer signature-level) and narrowly scope URI grants."
+    },
+    {
+      "id": "STO005",
+      "name": "Sensitive Data in Logs",
+      "severity": "high",
+      "confidence": "medium",
+      "owasp": "M9",
+      "location": "com/android/insecurebankv2/DoLogin.java:116",
+      "file": "com/android/insecurebankv2/DoLogin.java",
+      "line": 116,
+      "evidence": "Log.d(\"Successful Login:\", \", account=\" + DoLogin.this.username + \":\" + DoLogin.this.password)",
+      "context": "            if (DoLogin.this.result != null) {\n                if (DoLogin.this.result.indexOf(\"Correct Credentials\") != -1) {\n                    Log.d(\"Successful Login:\", \", account=\" + DoLogin.this.username + \":\" + DoLogin.this.password);\n                    saveCreds(DoLogin.this.username, DoLogin.this.password);\n                    trackUserLogins();",
+      "description": "Sensitive data may be written to system logs. Logs are accessible to other apps on older Android versions.",
+      "remediation": "Never log sensitive data. Use ProGuard/R8 to strip Log calls from release builds."
+    },
+    {
+      "id": "WEB005",
+      "name": "WebView Loading User-Controlled URL",
+      "severity": "high",
+      "confidence": "medium",
+      "owasp": "M4",
+      "location": "com/android/insecurebankv2/MyWebViewClient.java:10",
+      "file": "com/android/insecurebankv2/MyWebViewClient.java",
+      "line": 10,
+      "evidence": "loadUrl(u",
+      "context": "    @Override // android.webkit.WebViewClient\n    public boolean shouldOverrideUrlLoading(WebView view, String url) {\n        view.loadUrl(url);\n        return true;\n    }",
+      "description": "WebView loads a URL from a variable, potentially user-controlled. Can lead to loading malicious content.",
+      "remediation": "Validate and sanitize all URLs before loading in WebView. Use an allowlist of trusted domains."
+    },
+    {
+      "id": "PERM001",
+      "name": "Critical Permission: SEND_SMS",
+      "severity": "high",
+      "confidence": "high",
+      "owasp": "M8",
+      "location": "AndroidManifest.xml \u2192 <uses-permission>",
+      "evidence": "android.permission.SEND_SMS",
+      "description": "App can send SMS messages. Can send premium SMS or phishing messages.",
+      "remediation": "Review if this permission is truly needed. Request at runtime and explain to users why it's required."
+    },
+    {
+      "id": "ENT001",
+      "name": "High-Entropy String: Base64-Encoded Secret",
+      "severity": "high",
+      "confidence": "medium",
+      "owasp": "M1",
+      "location": "com/google/android/gms/internal/zzat.java",
+      "evidence": "w41pUAmd6TXdoU2/Z72GoKBjAyNw4B9JmpSTu2qFRaDsI7+5gLrSInCAebksSHto",
+      "description": "Shannon entropy: 5.36 bits/char. Base64-Encoded Secret detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.",
+      "remediation": "Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.",
+      "entropy": 5.36
+    },
+    {
+      "id": "ENT001",
+      "name": "High-Entropy String: Base64-Encoded Secret",
+      "severity": "high",
+      "confidence": "medium",
+      "owasp": "M1",
+      "location": "com/google/android/gms/internal/zzat.java",
+      "evidence": "2RUillTqy9QCgJa1LFspH1z+fWwdgPAByGujcpTf13CMmYA3W3Y+TBVqeDwkRNkY",
+      "description": "Shannon entropy: 5.27 bits/char. Base64-Encoded Secret detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.",
+      "remediation": "Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.",
+      "entropy": 5.27
+    },
+    {
+      "id": "ENT001",
+      "name": "High-Entropy String: Potential Secret/Token",
+      "severity": "high",
+      "confidence": "medium",
+      "owasp": "M1",
+      "location": "com/google/android/gms/plus/internal/model/moments/ItemScopeEntity.java",
+      "evidence": ", 50, ItemScopeEntity.class));\n        zzaHP.put(PlusShare.KEY_CONTENT_DEEP_LINK...",
+      "description": "Shannon entropy: 5.22 bits/char. Potential Secret/Token detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.",
+      "remediation": "Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.",
+      "entropy": 5.22
+    },
+    {
+      "id": "ENT001",
+      "name": "High-Entropy String: Potential Secret/Token",
+      "severity": "high",
+      "confidence": "medium",
+      "owasp": "M1",
+      "location": "com/google/android/gms/common/zzc.java",
+      "evidence": "\u00c6\\u008f\u00ffB+\u00f1Ui\u00b8^\u00ee\u00ed\u00b0J\u00a3\\bs\u00db\u00e6K\\u009c\\u009et\u00f8\u00f2\u00c2\u00f6\u00c4\\u0001$\u00aa\u00a8\u00d1x\\r\\u0018Q+T\\n\u00dd(\u00b3\u00e9X\\u0019q...",
+      "description": "Shannon entropy: 5.18 bits/char. Potential Secret/Token detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.",
+      "remediation": "Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.",
+      "entropy": 5.18
+    },
+    {
+      "id": "ENT001",
+      "name": "High-Entropy String: Potential Secret/Token",
+      "severity": "high",
+      "confidence": "medium",
+      "owasp": "M1",
+      "location": "com/google/android/gms/common/zzc.java",
+      "evidence": "\u00b6\u00e2(\u00af\u00a4\u00bd\\u0081\u00fbR\\u008f\u00a4\\u0010E\u00a3kt\u00f7\u00dcU\\u00902\\u0082\u00e3\u00c5\\u0089.\\u0013_}\u00eb\u00b1G\u00bf\u00f4\u00b1f|X\u00b8m\u00e6\u00b7:P\u00c3...",
+      "description": "Shannon entropy: 5.18 bits/char. Potential Secret/Token detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.",
+      "remediation": "Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.",
+      "entropy": 5.18
+    },
+    {
+      "id": "ENT001",
+      "name": "High-Entropy String: Base64-Encoded Secret (and 15 more)",
+      "severity": "high",
+      "confidence": "low",
+      "owasp": "M1",
+      "location": "Various locations",
+      "evidence": "Multiple instances (20) detected",
+      "description": "Found 20 total instances of this vulnerability. Only the first 5 are shown in detail above.",
+      "remediation": "Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code."
+    },
+    {
+      "id": "ADV003",
+      "name": "Exported Broadcast Receiver Without Sender Permission Guard",
+      "severity": "high",
+      "confidence": "medium",
+      "owasp": "M8",
+      "location": "AndroidManifest.xml \u2192 <receiver android:name=\"com.android.insecurebankv2.MyBroadCastReceiver\">",
+      "evidence": "exported receiver without android:permission; custom actions=theBroadcast; sensitive behavior in com/android/insecurebankv2/MyBroadCastReceiver.java:21 (SharedPreferences)",
+      "description": "Receiver is externally reachable and appears to process potentially sensitive operations without sender permission checks.",
+      "remediation": "Set android:exported='false' if external access is unnecessary, or enforce signature-level android:permission and validate sender identity."
+    },
+    {
+      "id": "MAN001",
+      "name": "Low Minimum SDK Version",
+      "severity": "medium",
+      "confidence": "high",
+      "owasp": "M8",
+      "location": "AndroidManifest.xml",
+      "evidence": "minSdkVersion=15",
+      "description": "App supports Android API 15 which lacks many security features introduced in later versions.",
+      "remediation": "Increase minSdkVersion to at least 21 (Android 5.0) to benefit from modern security features."
+    },
+    {
+      "id": "MAN003",
+      "name": "Application Data Backup Allowed",
+      "severity": "medium",
+      "confidence": "high",
+      "owasp": "M9",
+      "location": "AndroidManifest.xml \u2192 <application>",
+      "evidence": "android:allowBackup=\"true\"",
+      "description": "ADB backup is enabled. An attacker with physical access can extract application data via 'adb backup'.",
+      "remediation": "Set android:allowBackup='false' in AndroidManifest.xml, or implement BackupAgent to exclude sensitive data."
+    },
+    {
+      "id": "STO004",
+      "name": "Unencrypted SQLite Database",
+      "severity": "medium",
+      "confidence": "medium",
+      "owasp": "M9",
+      "location": "com/android/insecurebankv2/TrackUserContentProvider.java:73",
+      "file": "com/android/insecurebankv2/TrackUserContentProvider.java",
+      "line": 73,
+      "evidence": ".getWritableDatabase",
+      "context": "        Context context = getContext();\n        DatabaseHelper dbHelper = new DatabaseHelper(context);\n        this.db = dbHelper.getWritableDatabase();\n        return this.db != null;\n    }",
+      "description": "SQLite database used without encryption. On rooted devices, database files can be read directly.",
+      "remediation": "Use SQLCipher or Android's EncryptedFile API to encrypt the database."
+    },
+    {
+      "id": "STO003",
+      "name": "External Storage Usage",
+      "severity": "medium",
+      "confidence": "medium",
+      "owasp": "M9",
+      "location": "com/android/insecurebankv2/ViewStatement.java:25",
+      "file": "com/android/insecurebankv2/ViewStatement.java",
+      "line": 25,
+      "evidence": "getExternalStorageDirectory",
+      "context": "        this.uname = intent.getStringExtra(\"uname\");\n        String FILENAME = \"Statements_\" + this.uname + \".html\";\n        File fileToCheck = new File(Environment.getExternalStorageDirectory(), FILENAME);\n        System.out.println(fileToCheck.toString());\n        if (fileToCheck.exists()) {",
+      "description": "Application writes to external storage. Files on external storage are world-readable on older Android versions.",
+      "remediation": "Use internal storage (getFilesDir()) for sensitive data. If external storage is required, encrypt the data first."
+    },
+    {
+      "id": "STO003",
+      "name": "External Storage Usage",
+      "severity": "medium",
+      "confidence": "medium",
+      "owasp": "M9",
+      "location": "com/android/insecurebankv2/DoTransfer.java:162",
+      "file": "com/android/insecurebankv2/DoTransfer.java",
+      "line": 162,
+      "evidence": "getExternalStorageDirectory",
+      "context": "                                String status = new String(\"\\nMessage:Success From:\" + DoTransfer.this.from.getText().toString() + \" To:\" + DoTransfer.this.to.getText().toString() + \" Amount:\" + DoTransfer.this.amount.getText().toString() + \"\\n\");\n                                try {\n                                    String MYFILE = Environment.getExternalStorageDirectory() + \"/Statements_\" + DoTransfer.this.usernameBase64ByteString + \".html\";\n                                    BufferedWriter out2 = new BufferedWriter(new FileWriter(MYFILE, true));\n                                    out2.write(status);",
+      "description": "Application writes to external storage. Files on external storage are world-readable on older Android versions.",
+      "remediation": "Use internal storage (getFilesDir()) for sensitive data. If external storage is required, encrypt the data first."
+    },
+    {
+      "id": "WEB001",
+      "name": "JavaScript Enabled in WebView",
+      "severity": "medium",
+      "confidence": "high",
+      "owasp": "M8",
+      "location": "com/android/insecurebankv2/ViewStatement.java:30",
+      "file": "com/android/insecurebankv2/ViewStatement.java",
+      "line": 30,
+      "evidence": "setJavaScriptEnabled(true)",
+      "context": "            WebView mWebView = (WebView) findViewById(R.id.webView1);\n            mWebView.loadUrl(\"file://\" + Environment.getExternalStorageDirectory() + \"/Statements_\" + this.uname + \".html\");\n            mWebView.getSettings().setJavaScriptEnabled(true);\n            mWebView.getSettings().setSaveFormData(true);\n            mWebView.getSettings().setBuiltInZoomControls(true);",
+      "description": "JavaScript enabled in WebView. If loading untrusted content, this can lead to XSS attacks.",
+      "remediation": "Only enable JavaScript if absolutely necessary. Validate all URLs loaded in the WebView."
+    },
+    {
+      "id": "BIN001",
+      "name": "No Code Obfuscation Detected",
+      "severity": "medium",
+      "confidence": "low",
+      "owasp": "M7",
+      "location": "Application Binary",
+      "evidence": "0/9521 classes have short names (0% obfuscation ratio)",
+      "description": "The app does not appear to use ProGuard/R8 obfuscation. Note: This check may have false positives on decompiled (jadx) output. Best practice is to enable minification for release builds.",
+      "remediation": "Enable R8/ProGuard in build.gradle: minifyEnabled = true, and configure proguard-rules.pro."
+    },
+    {
+      "id": "BIN004",
+      "name": "No SSL/TLS Certificate Pinning in Code",
+      "severity": "medium",
+      "confidence": "medium",
+      "owasp": "M5",
+      "location": "Application Binary",
+      "evidence": "No certificate pinning implementation found in source code",
+      "description": "The app does not implement certificate pinning in code. Without pinning, MITM attacks using rogue CA certificates can intercept all HTTPS traffic.",
+      "remediation": "Use OkHttp CertificatePinner or Android's network_security_config.xml with <pin-set> elements for your API domains."
+    },
+    {
+      "id": "ADV004",
+      "name": "Dynamic Broadcast Receiver Without Permission Guard",
+      "severity": "medium",
+      "confidence": "high",
+      "owasp": "M8",
+      "location": "com/google/android/gms/iid/InstanceIDListenerService.java:83",
+      "file": "com/google/android/gms/iid/InstanceIDListenerService.java",
+      "line": 83,
+      "evidence": "registerReceiver(this.zzawV, intentFilter, \"com.google.android.c2dm.permission.RECEIVE\", null)",
+      "context": "        IntentFilter intentFilter = new IntentFilter(\"com.google.android.c2dm.intent.REGISTRATION\");\n        intentFilter.addCategory(getPackageName());\n        registerReceiver(this.zzawV, intentFilter, \"com.google.android.c2dm.permission.RECEIVE\", null);\n    }\n",
+      "description": "A dynamically registered receiver appears to accept custom broadcasts without a required sender permission, and the code handles sensitive actions.",
+      "remediation": "Use registerReceiver overloads with required permission and RECEIVER_NOT_EXPORTED where possible."
+    },
+    {
+      "id": "ADV004",
+      "name": "Dynamic Broadcast Receiver Without Permission Guard",
+      "severity": "medium",
+      "confidence": "high",
+      "owasp": "M8",
+      "location": "com/google/android/gms/iid/InstanceIDListenerService.java:88",
+      "file": "com/google/android/gms/iid/InstanceIDListenerService.java",
+      "line": 88,
+      "evidence": "registerReceiver(this.zzawV)",
+      "context": "    @Override // android.app.Service\n    public void onDestroy() {\n        unregisterReceiver(this.zzawV);\n    }\n",
+      "description": "A dynamically registered receiver appears to accept custom broadcasts without a required sender permission, and the code handles sensitive actions.",
+      "remediation": "Use registerReceiver overloads with required permission and RECEIVER_NOT_EXPORTED where possible."
+    },
+    {
+      "id": "ADV004",
+      "name": "Dynamic Broadcast Receiver Without Permission Guard",
+      "severity": "medium",
+      "confidence": "medium",
+      "owasp": "M8",
+      "location": "com/google/android/gms/cast/CastRemoteDisplayLocalService.java:327",
+      "file": "com/google/android/gms/cast/CastRemoteDisplayLocalService.java",
+      "line": 327,
+      "evidence": "registerReceiver(this.zzRd, new IntentFilter(\"com.google.android.gms.cast.remote_display.ACTION_NOTIFICATION_DISCONNECT\"))",
+      "context": "        this.mNotification = notificationSettings.mNotification;\n        this.zzRd = new zzb();\n        registerReceiver(this.zzRd, new IntentFilter(\"com.google.android.gms.cast.remote_display.ACTION_NOTIFICATION_DISCONNECT\"));\n        this.zzRe = new NotificationSettings(notificationSettings);\n        if (this.zzRe.mNotification == null) {",
+      "description": "A dynamically registered receiver appears to accept custom broadcasts without a required sender permission, and the code handles sensitive actions.",
+      "remediation": "Use registerReceiver overloads with required permission and RECEIVER_NOT_EXPORTED where possible."
+    },
+    {
+      "id": "MAN005",
+      "name": "Missing Network Security Configuration",
+      "severity": "info",
+      "confidence": "high",
+      "owasp": "M5",
+      "location": "AndroidManifest.xml \u2192 <application>",
+      "evidence": "No android:networkSecurityConfig attribute",
+      "description": "No custom network security configuration. App relies on platform defaults for certificate handling.",
+      "remediation": "Add a network_security_config.xml to explicitly control certificate pinning and cleartext behavior."
+    },
+    {
+      "id": "MAN010",
+      "name": "Exported Activity Without Permission",
+      "severity": "info",
+      "confidence": "medium",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 <activity android:name=\"com.android.insecurebankv2.PostLogin\">",
+      "evidence": "android:exported=\"true\" (or implied via intent-filter) with no permission requirement",
+      "description": "The activity 'com.android.insecurebankv2.PostLogin' is exported and accessible by any app without permission. This may allow unauthorized access to internal functionality.",
+      "remediation": "Set android:exported='false' if external access is not needed, or add android:permission to restrict access."
+    },
+    {
+      "id": "MAN010",
+      "name": "Exported Activity Without Permission",
+      "severity": "info",
+      "confidence": "medium",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 <activity android:name=\"com.android.insecurebankv2.DoTransfer\">",
+      "evidence": "android:exported=\"true\" (or implied via intent-filter) with no permission requirement",
+      "description": "The activity 'com.android.insecurebankv2.DoTransfer' is exported and accessible by any app without permission. This may allow unauthorized access to internal functionality.",
+      "remediation": "Set android:exported='false' if external access is not needed, or add android:permission to restrict access."
+    },
+    {
+      "id": "MAN010",
+      "name": "Exported Activity Without Permission",
+      "severity": "info",
+      "confidence": "medium",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 <activity android:name=\"com.android.insecurebankv2.ViewStatement\">",
+      "evidence": "android:exported=\"true\" (or implied via intent-filter) with no permission requirement",
+      "description": "The activity 'com.android.insecurebankv2.ViewStatement' is exported and accessible by any app without permission. This may allow unauthorized access to internal functionality.",
+      "remediation": "Set android:exported='false' if external access is not needed, or add android:permission to restrict access."
+    },
+    {
+      "id": "MAN010",
+      "name": "Exported Receiver Without Permission",
+      "severity": "info",
+      "confidence": "medium",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 <receiver android:name=\"com.android.insecurebankv2.MyBroadCastReceiver\">",
+      "evidence": "android:exported=\"true\" (or implied via intent-filter) with no permission requirement",
+      "description": "The receiver 'com.android.insecurebankv2.MyBroadCastReceiver' is exported and accessible by any app without permission. This may allow unauthorized access to internal functionality.",
+      "remediation": "Set android:exported='false' if external access is not needed, or add android:permission to restrict access."
+    },
+    {
+      "id": "MAN011",
+      "name": "1 Additional Exported Activity(s)",
+      "severity": "info",
+      "confidence": "medium",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml",
+      "evidence": "4 total exported activitys without permission guards",
+      "description": "There are 4 total exported activity components without explicit permission guards. Only the first 3 are shown individually above.",
+      "remediation": "Review all exported components and restrict access where not needed."
+    },
+    {
+      "id": "PERM002",
+      "name": "Dangerous Permissions Summary: 4 found",
+      "severity": "info",
+      "confidence": "high",
+      "owasp": "M6",
+      "location": "AndroidManifest.xml",
+      "evidence": "4 dangerous permissions requested out of 9 total",
+      "description": "The app requests 4 permissions classified as 'dangerous' by Android. Each requires runtime approval from the user. A high count may indicate over-privileged access but is common in feature-rich applications.",
+      "remediation": "Review each permission and remove those not essential to core functionality. Follow the principle of least privilege."
+    },
+    {
+      "id": "NETCFG001",
+      "name": "Missing Network Security Configuration",
+      "severity": "info",
+      "confidence": "high",
+      "owasp": "M5",
+      "location": "res/xml/network_security_config.xml",
+      "evidence": "File not found",
+      "description": "No network_security_config.xml found. Without this, the app relies on platform defaults which vary by Android version. Apps targeting SDK 28+ block cleartext by default, but older targets allow it.",
+      "remediation": "Create a network_security_config.xml that explicitly disables cleartext traffic and configures certificate pinning for your API endpoints."
+    },
+    {
+      "id": "DEEP004",
+      "name": "Exported Activity Without Intent Filter",
+      "severity": "info",
+      "confidence": "medium",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 com.android.insecurebankv2.PostLogin",
+      "evidence": "android:exported=\"true\" with no intent-filter",
+      "description": "The activity com.android.insecurebankv2.PostLogin is exported without an intent filter. Any app can start this activity with an explicit intent, potentially bypassing authentication or accessing internal screens.",
+      "remediation": "Set android:exported=\"false\" unless the activity needs to be accessible by other apps. If exported is needed, add a permission check."
+    },
+    {
+      "id": "DEEP004",
+      "name": "Exported Activity Without Intent Filter",
+      "severity": "info",
+      "confidence": "medium",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 com.android.insecurebankv2.DoTransfer",
+      "evidence": "android:exported=\"true\" with no intent-filter",
+      "description": "The activity com.android.insecurebankv2.DoTransfer is exported without an intent filter. Any app can start this activity with an explicit intent, potentially bypassing authentication or accessing internal screens.",
+      "remediation": "Set android:exported=\"false\" unless the activity needs to be accessible by other apps. If exported is needed, add a permission check."
+    },
+    {
+      "id": "DEEP004",
+      "name": "Exported Activity Without Intent Filter",
+      "severity": "info",
+      "confidence": "medium",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 com.android.insecurebankv2.ViewStatement",
+      "evidence": "android:exported=\"true\" with no intent-filter",
+      "description": "The activity com.android.insecurebankv2.ViewStatement is exported without an intent filter. Any app can start this activity with an explicit intent, potentially bypassing authentication or accessing internal screens.",
+      "remediation": "Set android:exported=\"false\" unless the activity needs to be accessible by other apps. If exported is needed, add a permission check."
+    },
+    {
+      "id": "DEEP004",
+      "name": "Exported Activity Without Intent Filter",
+      "severity": "info",
+      "confidence": "medium",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 com.android.insecurebankv2.ChangePassword",
+      "evidence": "android:exported=\"true\" with no intent-filter",
+      "description": "The activity com.android.insecurebankv2.ChangePassword is exported without an intent filter. Any app can start this activity with an explicit intent, potentially bypassing authentication or accessing internal screens.",
+      "remediation": "Set android:exported=\"false\" unless the activity needs to be accessible by other apps. If exported is needed, add a permission check."
+    },
+    {
+      "id": "DEEP005",
+      "name": "Unprotected Broadcast Receiver",
+      "severity": "info",
+      "confidence": "low",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 com.android.insecurebankv2.MyBroadCastReceiver",
+      "evidence": "Broadcast receiver with intent-filter but no permission guard",
+      "description": "The broadcast receiver com.android.insecurebankv2.MyBroadCastReceiver accepts intents from any app without requiring a permission. Malicious apps can send crafted intents to trigger unintended behavior.",
+      "remediation": "Add android:permission attribute to restrict which apps can send intents to this receiver, or set android:exported=\"false\"."
+    },
+    {
+      "id": "DEEP005",
+      "name": "Unprotected Broadcast Receiver",
+      "severity": "info",
+      "confidence": "low",
+      "owasp": "M3",
+      "location": "AndroidManifest.xml \u2192 com.google.android.gms.wallet.EnableWalletOptimizationReceiver",
+      "evidence": "Broadcast receiver with intent-filter but no permission guard",
+      "description": "The broadcast receiver com.google.android.gms.wallet.EnableWalletOptimizationReceiver accepts intents from any app without requiring a permission. Malicious apps can send crafted intents to trigger unintended behavior.",
+      "remediation": "Add android:permission attribute to restrict which apps can send intents to this receiver, or set android:exported=\"false\"."
+    },
+    {
+      "id": "BIN005",
+      "name": "Root Detection Implemented",
+      "severity": "info",
+      "confidence": "high",
+      "owasp": "M7",
+      "location": "Application Binary",
+      "evidence": "Root detection patterns found in source",
+      "description": "The app implements root detection, which is a good security practice.",
+      "remediation": "Ensure root detection is robust and cannot be easily bypassed with tools like Frida or Xposed."
+    }
+  ]
+}

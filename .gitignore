@@ -1,0 +1,36 @@
+# DroidSec - Optimized .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+*.log
+
+# Node.js
+node_modules/
+.next/
+out/
+build/
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Application Context
+backend/uploads/*
+backend/reports/*
+!backend/uploads/.gitkeep
+!backend/reports/.gitkeep
+
+# Tools & Binaries (Too large for GitHub)
+tools/apktool
+tools/apktool.jar
+tools/jadx/
+tools/jadx.zip
+*.apk
+
+# OS files
+.DS_Store
+Thumbs.db

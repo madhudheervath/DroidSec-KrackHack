@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-multipart
+androguard
+jinja2
+aiofiles
+pydantic
+google-generativeai
+groq

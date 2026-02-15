@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DroidSec Security Report — com.android.insecurebankv2</title>
+<style>
+  :root {
+    --bg: #0f0f14;
+    --surface: #1a1a24;
+    --surface2: #232333;
+    --border: #2a2a3d;
+    --text: #e4e4ef;
+    --text-muted: #8888aa;
+    --critical: #ff4757;
+    --high: #ff8c42;
+    --medium: #ffd166;
+    --info: #6ec6ff;
+    --accent: #7c5cfc;
+    --success: #2ed573;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 2rem; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 2rem; padding: 2rem; background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%); border-radius: 16px; border: 1px solid var(--border); }
+  .header h1 { font-size: 2rem; background: linear-gradient(135deg, var(--accent), var(--info)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header .subtitle { color: var(--text-muted); margin-top: 0.5rem; }
+  .score-container { display: flex; justify-content: center; gap: 2rem; margin: 2rem 0; flex-wrap: wrap; }
+  .score-card { background: var(--surface); padding: 1.5rem 2rem; border-radius: 12px; border: 1px solid var(--border); text-align: center; min-width: 160px; }
+  .score-card .value { font-size: 2.5rem; font-weight: 800; }
+  .score-card .label { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
+  .grade-A { color: var(--success); }
+  .grade-B { color: var(--info); }
+  .grade-C { color: var(--medium); }
+  .grade-D { color: var(--high); }
+  .grade-F { color: var(--critical); }
+  .summary { background: var(--surface); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); margin: 1.5rem 0; }
+  .summary h2 { font-size: 1.2rem; margin-bottom: 0.5rem; }
+  .summary p { color: var(--text-muted); }
+  .severity-bar { display: flex; gap: 0.5rem; margin: 1.5rem 0; }
+  .severity-bar .bar { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; }
+  .sev-critical { background: rgba(255,71,87,0.15); color: var(--critical); border: 1px solid rgba(255,71,87,0.3); }
+  .sev-high { background: rgba(255,140,66,0.15); color: var(--high); border: 1px solid rgba(255,140,66,0.3); }
+  .sev-medium { background: rgba(255,209,102,0.15); color: var(--medium); border: 1px solid rgba(255,209,102,0.3); }
+  .sev-info { background: rgba(110,198,255,0.15); color: var(--info); border: 1px solid rgba(110,198,255,0.3); }
+  .findings { margin: 2rem 0; }
+  .findings h2 { font-size: 1.4rem; margin-bottom: 1rem; }
+  .finding { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); margin: 1rem 0; overflow: hidden; }
+  .finding-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
+  .finding-header h3 { font-size: 1rem; }
+  .finding-body { padding: 1rem 1.5rem; }
+  .finding-body .meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+  .finding-body .meta span { font-size: 0.8rem; padding: 0.2rem 0.6rem; border-radius: 4px; background: var(--surface2); color: var(--text-muted); }
+  .finding-body .description { margin: 0.5rem 0; }
+  .finding-body .evidence { background: var(--bg); padding: 0.75rem 1rem; border-radius: 8px; font-family: 'Cascadia Code', monospace; font-size: 0.85rem; margin: 0.5rem 0; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+  .finding-body .remediation { background: rgba(46,213,115,0.08); border: 1px solid rgba(46,213,115,0.2); border-radius: 8px; padding: 0.75rem 1rem; margin-top: 0.75rem; }
+  .finding-body .remediation strong { color: var(--success); }
+  .badge { font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .footer { text-align: center; color: var(--text-muted); margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.85rem; }
+  @media print {
+    body { background: #fff; color: #111; }
+    .container { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🛡️ DroidSec Security Report</h1>
+    <div class="subtitle">Static Analysis Report for <strong>com.android.insecurebankv2</strong></div>
+    <div class="subtitle">Generated on 2026-02-14 13:25:20</div>
+  </div>
+
+  <div class="score-container">
+    <div class="score-card">
+      <div class="value grade-F">24</div>
+      <div class="label">Security Score</div>
+    </div>
+    <div class="score-card">
+      <div class="value grade-F">F</div>
+      <div class="label">Grade</div>
+    </div>
+    <div class="score-card">
+      <div class="value">53</div>
+      <div class="label">Findings</div>
+    </div>
+    <div class="score-card">
+      <div class="value">Critical</div>
+      <div class="label">Risk Level</div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <h2>📋 Executive Summary</h2>
+    <p>DroidSec identified 53 security findings (2 critical, 25 high, 11 medium severity), resulting in a security score of 24/100 (Grade F). This application has severe security issues and should NOT be released without remediation.</p>
+  </div>
+
+  <div class="severity-bar">
+    <div class="bar sev-critical">🔴 Critical: 2</div>
+    <div class="bar sev-high">🟠 High: 25</div>
+    <div class="bar sev-medium">🟡 Medium: 11</div>
+    <div class="bar sev-info">🔵 Info: 15</div>
+  </div>
+
+  <div class="findings">
+    <h2>🔍 Detailed Findings</h2>
+    
+<div class="finding">
+  <div class="finding-header">
+    <h3>Application is Debuggable</h3>
+    <span class="badge sev-critical">CRITICAL</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M7 — Insufficient Binary Protections</span>
+      <span>Confidence: High</span>
+      <span>📍 AndroidManifest.xml → <application></span>
+    </div>
+    <div class="description">The application is set as debuggable. Attackers can attach a debugger, inspect memory, and modify runtime behavior.</div>
+    <div class="evidence">android:debuggable="true"</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:debuggable='false' in release builds. Ensure build.gradle sets debuggable=false for release.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Hardcoded Password</h3>
+    <span class="badge sev-critical">CRITICAL</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M1 — Improper Credential Usage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/android/insecurebankv2/ChangePassword.java:70</span>
+    </div>
+    <div class="description">Hardcoded password found in source code. Easily extractable by decompiling the APK.</div>
+    <div class="evidence">password=" + this.uname);
+        this.textView_Username = (TextView) findViewById(R.id.textView_Username);
+        this.textView_Username.setText(this.uname);
+        this.changePassword_button = (Bu</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Never hardcode passwords. Use Android Keystore for storing secrets. Implement proper authentication flows.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported ContentProvider With Weak Permission Model</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M8 — Security Misconfiguration</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → <provider android:name="com.android.insecurebankv2.TrackUserContentProvider"></span>
+    </div>
+    <div class="description">Provider 'com.android.insecurebankv2.TrackUserContentProvider' is exported without android:permission/readPermission/writePermission. This can expose app data over content:// URIs to other apps. No grant-uri-permission scoping was detected.</div>
+    <div class="evidence">android:exported="true" (or implied via intent-filter) with no permission requirement</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported='false' unless cross-app sharing is required. If sharing is required, enforce readPermission/writePermission (prefer signature-level) and narrowly scope URI grants.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Sensitive Data in Logs</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M9 — Insecure Data Storage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/android/insecurebankv2/DoLogin.java:116</span>
+    </div>
+    <div class="description">Sensitive data may be written to system logs. Logs are accessible to other apps on older Android versions.</div>
+    <div class="evidence">Log.d("Successful Login:", ", account=" + DoLogin.this.username + ":" + DoLogin.this.password)</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Never log sensitive data. Use ProGuard/R8 to strip Log calls from release builds.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>WebView Loading User-Controlled URL</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M4 — Insufficient Input/Output Validation</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/android/insecurebankv2/MyWebViewClient.java:10</span>
+    </div>
+    <div class="description">WebView loads a URL from a variable, potentially user-controlled. Can lead to loading malicious content.</div>
+    <div class="evidence">loadUrl(u</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Validate and sanitize all URLs before loading in WebView. Use an allowlist of trusted domains.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Critical Permission: SEND_SMS</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M8 — Security Misconfiguration</span>
+      <span>Confidence: High</span>
+      <span>📍 AndroidManifest.xml → <uses-permission></span>
+    </div>
+    <div class="description">App can send SMS messages. Can send premium SMS or phishing messages.</div>
+    <div class="evidence">android.permission.SEND_SMS</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Review if this permission is truly needed. Request at runtime and explain to users why it's required.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>High-Entropy String: Base64-Encoded Secret</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M1 — Improper Credential Usage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/google/android/gms/internal/zzat.java</span>
+    </div>
+    <div class="description">Shannon entropy: 5.36 bits/char. Base64-Encoded Secret detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.</div>
+    <div class="evidence">w41pUAmd6TXdoU2/Z72GoKBjAyNw4B9JmpSTu2qFRaDsI7+5gLrSInCAebksSHto</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>High-Entropy String: Base64-Encoded Secret</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M1 — Improper Credential Usage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/google/android/gms/internal/zzat.java</span>
+    </div>
+    <div class="description">Shannon entropy: 5.27 bits/char. Base64-Encoded Secret detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.</div>
+    <div class="evidence">2RUillTqy9QCgJa1LFspH1z+fWwdgPAByGujcpTf13CMmYA3W3Y+TBVqeDwkRNkY</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>High-Entropy String: Potential Secret/Token</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M1 — Improper Credential Usage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/google/android/gms/plus/internal/model/moments/ItemScopeEntity.java</span>
+    </div>
+    <div class="description">Shannon entropy: 5.22 bits/char. Potential Secret/Token detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.</div>
+    <div class="evidence">, 50, ItemScopeEntity.class));
+        zzaHP.put(PlusShare.KEY_CONTENT_DEEP_LINK...</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>High-Entropy String: Potential Secret/Token</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M1 — Improper Credential Usage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/google/android/gms/common/zzc.java</span>
+    </div>
+    <div class="description">Shannon entropy: 5.18 bits/char. Potential Secret/Token detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.</div>
+    <div class="evidence">Æ\u008fÿB+ñUi¸^îí°J£\bsÛæK\u009c\u009etøòÂöÄ\u0001$ª¨Ñx\r\u0018Q+T\nÝ(³éX\u0019q...</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>High-Entropy String: Potential Secret/Token</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M1 — Improper Credential Usage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/google/android/gms/common/zzc.java</span>
+    </div>
+    <div class="description">Shannon entropy: 5.18 bits/char. Potential Secret/Token detected. High-entropy strings in source code often indicate hardcoded secrets, API keys, or cryptographic material that should be stored securely.</div>
+    <div class="evidence">¶â(¯¤½\u0081ûR\u008f¤\u0010E£kt÷ÜU\u00902\u0082ãÅ\u0089.\u0013_}ë±G¿ô±f|X¸mæ·:PÃ...</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>High-Entropy String: Base64-Encoded Secret (and 15 more)</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M1 — Improper Credential Usage</span>
+      <span>Confidence: Low</span>
+      <span>📍 Various locations</span>
+    </div>
+    <div class="description">Found 20 total instances of this vulnerability. Only the first 5 are shown in detail above.</div>
+    <div class="evidence">Multiple instances (20) detected</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Move secrets to Android Keystore, environment variables, or a secure vault. Never hardcode secrets in source code.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported Broadcast Receiver Without Sender Permission Guard</h3>
+    <span class="badge sev-high">HIGH</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M8 — Security Misconfiguration</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → <receiver android:name="com.android.insecurebankv2.MyBroadCastReceiver"></span>
+    </div>
+    <div class="description">Receiver is externally reachable and appears to process potentially sensitive operations without sender permission checks.</div>
+    <div class="evidence">exported receiver without android:permission; custom actions=theBroadcast; sensitive behavior in com/android/insecurebankv2/MyBroadCastReceiver.java:21 (SharedPreferences)</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported='false' if external access is unnecessary, or enforce signature-level android:permission and validate sender identity.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Low Minimum SDK Version</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M8 — Security Misconfiguration</span>
+      <span>Confidence: High</span>
+      <span>📍 AndroidManifest.xml</span>
+    </div>
+    <div class="description">App supports Android API 15 which lacks many security features introduced in later versions.</div>
+    <div class="evidence">minSdkVersion=15</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Increase minSdkVersion to at least 21 (Android 5.0) to benefit from modern security features.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Application Data Backup Allowed</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M9 — Insecure Data Storage</span>
+      <span>Confidence: High</span>
+      <span>📍 AndroidManifest.xml → <application></span>
+    </div>
+    <div class="description">ADB backup is enabled. An attacker with physical access can extract application data via 'adb backup'.</div>
+    <div class="evidence">android:allowBackup="true"</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:allowBackup='false' in AndroidManifest.xml, or implement BackupAgent to exclude sensitive data.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Unencrypted SQLite Database</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M9 — Insecure Data Storage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/android/insecurebankv2/TrackUserContentProvider.java:73</span>
+    </div>
+    <div class="description">SQLite database used without encryption. On rooted devices, database files can be read directly.</div>
+    <div class="evidence">.getWritableDatabase</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Use SQLCipher or Android's EncryptedFile API to encrypt the database.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>External Storage Usage</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M9 — Insecure Data Storage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/android/insecurebankv2/ViewStatement.java:25</span>
+    </div>
+    <div class="description">Application writes to external storage. Files on external storage are world-readable on older Android versions.</div>
+    <div class="evidence">getExternalStorageDirectory</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Use internal storage (getFilesDir()) for sensitive data. If external storage is required, encrypt the data first.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>External Storage Usage</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M9 — Insecure Data Storage</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/android/insecurebankv2/DoTransfer.java:162</span>
+    </div>
+    <div class="description">Application writes to external storage. Files on external storage are world-readable on older Android versions.</div>
+    <div class="evidence">getExternalStorageDirectory</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Use internal storage (getFilesDir()) for sensitive data. If external storage is required, encrypt the data first.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>JavaScript Enabled in WebView</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M8 — Security Misconfiguration</span>
+      <span>Confidence: High</span>
+      <span>📍 com/android/insecurebankv2/ViewStatement.java:30</span>
+    </div>
+    <div class="description">JavaScript enabled in WebView. If loading untrusted content, this can lead to XSS attacks.</div>
+    <div class="evidence">setJavaScriptEnabled(true)</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Only enable JavaScript if absolutely necessary. Validate all URLs loaded in the WebView.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>No Code Obfuscation Detected</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M7 — Insufficient Binary Protections</span>
+      <span>Confidence: Low</span>
+      <span>📍 Application Binary</span>
+    </div>
+    <div class="description">The app does not appear to use ProGuard/R8 obfuscation. Note: This check may have false positives on decompiled (jadx) output. Best practice is to enable minification for release builds.</div>
+    <div class="evidence">0/9521 classes have short names (0% obfuscation ratio)</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Enable R8/ProGuard in build.gradle: minifyEnabled = true, and configure proguard-rules.pro.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>No SSL/TLS Certificate Pinning in Code</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M5 — Insecure Communication</span>
+      <span>Confidence: Medium</span>
+      <span>📍 Application Binary</span>
+    </div>
+    <div class="description">The app does not implement certificate pinning in code. Without pinning, MITM attacks using rogue CA certificates can intercept all HTTPS traffic.</div>
+    <div class="evidence">No certificate pinning implementation found in source code</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Use OkHttp CertificatePinner or Android's network_security_config.xml with <pin-set> elements for your API domains.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Dynamic Broadcast Receiver Without Permission Guard</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M8 — Security Misconfiguration</span>
+      <span>Confidence: High</span>
+      <span>📍 com/google/android/gms/iid/InstanceIDListenerService.java:83</span>
+    </div>
+    <div class="description">A dynamically registered receiver appears to accept custom broadcasts without a required sender permission, and the code handles sensitive actions.</div>
+    <div class="evidence">registerReceiver(this.zzawV, intentFilter, "com.google.android.c2dm.permission.RECEIVE", null)</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Use registerReceiver overloads with required permission and RECEIVER_NOT_EXPORTED where possible.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Dynamic Broadcast Receiver Without Permission Guard</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M8 — Security Misconfiguration</span>
+      <span>Confidence: High</span>
+      <span>📍 com/google/android/gms/iid/InstanceIDListenerService.java:88</span>
+    </div>
+    <div class="description">A dynamically registered receiver appears to accept custom broadcasts without a required sender permission, and the code handles sensitive actions.</div>
+    <div class="evidence">registerReceiver(this.zzawV)</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Use registerReceiver overloads with required permission and RECEIVER_NOT_EXPORTED where possible.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Dynamic Broadcast Receiver Without Permission Guard</h3>
+    <span class="badge sev-medium">MEDIUM</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M8 — Security Misconfiguration</span>
+      <span>Confidence: Medium</span>
+      <span>📍 com/google/android/gms/cast/CastRemoteDisplayLocalService.java:327</span>
+    </div>
+    <div class="description">A dynamically registered receiver appears to accept custom broadcasts without a required sender permission, and the code handles sensitive actions.</div>
+    <div class="evidence">registerReceiver(this.zzRd, new IntentFilter("com.google.android.gms.cast.remote_display.ACTION_NOTIFICATION_DISCONNECT"))</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Use registerReceiver overloads with required permission and RECEIVER_NOT_EXPORTED where possible.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Missing Network Security Configuration</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M5 — Insecure Communication</span>
+      <span>Confidence: High</span>
+      <span>📍 AndroidManifest.xml → <application></span>
+    </div>
+    <div class="description">No custom network security configuration. App relies on platform defaults for certificate handling.</div>
+    <div class="evidence">No android:networkSecurityConfig attribute</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Add a network_security_config.xml to explicitly control certificate pinning and cleartext behavior.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported Activity Without Permission</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → <activity android:name="com.android.insecurebankv2.PostLogin"></span>
+    </div>
+    <div class="description">The activity 'com.android.insecurebankv2.PostLogin' is exported and accessible by any app without permission. This may allow unauthorized access to internal functionality.</div>
+    <div class="evidence">android:exported="true" (or implied via intent-filter) with no permission requirement</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported='false' if external access is not needed, or add android:permission to restrict access.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported Activity Without Permission</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → <activity android:name="com.android.insecurebankv2.DoTransfer"></span>
+    </div>
+    <div class="description">The activity 'com.android.insecurebankv2.DoTransfer' is exported and accessible by any app without permission. This may allow unauthorized access to internal functionality.</div>
+    <div class="evidence">android:exported="true" (or implied via intent-filter) with no permission requirement</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported='false' if external access is not needed, or add android:permission to restrict access.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported Activity Without Permission</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → <activity android:name="com.android.insecurebankv2.ViewStatement"></span>
+    </div>
+    <div class="description">The activity 'com.android.insecurebankv2.ViewStatement' is exported and accessible by any app without permission. This may allow unauthorized access to internal functionality.</div>
+    <div class="evidence">android:exported="true" (or implied via intent-filter) with no permission requirement</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported='false' if external access is not needed, or add android:permission to restrict access.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported Receiver Without Permission</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → <receiver android:name="com.android.insecurebankv2.MyBroadCastReceiver"></span>
+    </div>
+    <div class="description">The receiver 'com.android.insecurebankv2.MyBroadCastReceiver' is exported and accessible by any app without permission. This may allow unauthorized access to internal functionality.</div>
+    <div class="evidence">android:exported="true" (or implied via intent-filter) with no permission requirement</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported='false' if external access is not needed, or add android:permission to restrict access.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>1 Additional Exported Activity(s)</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml</span>
+    </div>
+    <div class="description">There are 4 total exported activity components without explicit permission guards. Only the first 3 are shown individually above.</div>
+    <div class="evidence">4 total exported activitys without permission guards</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Review all exported components and restrict access where not needed.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Dangerous Permissions Summary: 4 found</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M6 — Inadequate Privacy Controls</span>
+      <span>Confidence: High</span>
+      <span>📍 AndroidManifest.xml</span>
+    </div>
+    <div class="description">The app requests 4 permissions classified as 'dangerous' by Android. Each requires runtime approval from the user. A high count may indicate over-privileged access but is common in feature-rich applications.</div>
+    <div class="evidence">4 dangerous permissions requested out of 9 total</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Review each permission and remove those not essential to core functionality. Follow the principle of least privilege.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Missing Network Security Configuration</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M5 — Insecure Communication</span>
+      <span>Confidence: High</span>
+      <span>📍 res/xml/network_security_config.xml</span>
+    </div>
+    <div class="description">No network_security_config.xml found. Without this, the app relies on platform defaults which vary by Android version. Apps targeting SDK 28+ block cleartext by default, but older targets allow it.</div>
+    <div class="evidence">File not found</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Create a network_security_config.xml that explicitly disables cleartext traffic and configures certificate pinning for your API endpoints.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported Activity Without Intent Filter</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → com.android.insecurebankv2.PostLogin</span>
+    </div>
+    <div class="description">The activity com.android.insecurebankv2.PostLogin is exported without an intent filter. Any app can start this activity with an explicit intent, potentially bypassing authentication or accessing internal screens.</div>
+    <div class="evidence">android:exported="true" with no intent-filter</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported="false" unless the activity needs to be accessible by other apps. If exported is needed, add a permission check.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported Activity Without Intent Filter</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → com.android.insecurebankv2.DoTransfer</span>
+    </div>
+    <div class="description">The activity com.android.insecurebankv2.DoTransfer is exported without an intent filter. Any app can start this activity with an explicit intent, potentially bypassing authentication or accessing internal screens.</div>
+    <div class="evidence">android:exported="true" with no intent-filter</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported="false" unless the activity needs to be accessible by other apps. If exported is needed, add a permission check.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported Activity Without Intent Filter</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → com.android.insecurebankv2.ViewStatement</span>
+    </div>
+    <div class="description">The activity com.android.insecurebankv2.ViewStatement is exported without an intent filter. Any app can start this activity with an explicit intent, potentially bypassing authentication or accessing internal screens.</div>
+    <div class="evidence">android:exported="true" with no intent-filter</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported="false" unless the activity needs to be accessible by other apps. If exported is needed, add a permission check.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Exported Activity Without Intent Filter</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Medium</span>
+      <span>📍 AndroidManifest.xml → com.android.insecurebankv2.ChangePassword</span>
+    </div>
+    <div class="description">The activity com.android.insecurebankv2.ChangePassword is exported without an intent filter. Any app can start this activity with an explicit intent, potentially bypassing authentication or accessing internal screens.</div>
+    <div class="evidence">android:exported="true" with no intent-filter</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Set android:exported="false" unless the activity needs to be accessible by other apps. If exported is needed, add a permission check.</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Unprotected Broadcast Receiver</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Low</span>
+      <span>📍 AndroidManifest.xml → com.android.insecurebankv2.MyBroadCastReceiver</span>
+    </div>
+    <div class="description">The broadcast receiver com.android.insecurebankv2.MyBroadCastReceiver accepts intents from any app without requiring a permission. Malicious apps can send crafted intents to trigger unintended behavior.</div>
+    <div class="evidence">Broadcast receiver with intent-filter but no permission guard</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Add android:permission attribute to restrict which apps can send intents to this receiver, or set android:exported="false".</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Unprotected Broadcast Receiver</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M3 — Insecure Authentication/Authorization</span>
+      <span>Confidence: Low</span>
+      <span>📍 AndroidManifest.xml → com.google.android.gms.wallet.EnableWalletOptimizationReceiver</span>
+    </div>
+    <div class="description">The broadcast receiver com.google.android.gms.wallet.EnableWalletOptimizationReceiver accepts intents from any app without requiring a permission. Malicious apps can send crafted intents to trigger unintended behavior.</div>
+    <div class="evidence">Broadcast receiver with intent-filter but no permission guard</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Add android:permission attribute to restrict which apps can send intents to this receiver, or set android:exported="false".</div>
+  </div>
+</div>
+
+
+<div class="finding">
+  <div class="finding-header">
+    <h3>Root Detection Implemented</h3>
+    <span class="badge sev-info">INFO</span>
+  </div>
+  <div class="finding-body">
+    <div class="meta">
+      <span>OWASP: M7 — Insufficient Binary Protections</span>
+      <span>Confidence: High</span>
+      <span>📍 Application Binary</span>
+    </div>
+    <div class="description">The app implements root detection, which is a good security practice.</div>
+    <div class="evidence">Root detection patterns found in source</div>
+    <div class="remediation"><strong>✅ Remediation:</strong> Ensure root detection is robust and cannot be easily bypassed with tools like Frida or Xposed.</div>
+  </div>
+</div>
+
+  </div>
+
+  <div class="footer">
+    <p>Generated by DroidSec — APK Static Security Analyzer | KrackHack 3.0</p>
+  </div>
+</div>
+</body>
+</html>
