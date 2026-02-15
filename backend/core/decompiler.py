@@ -34,6 +34,16 @@ class Decompiler:
         except Exception:
             return 0
 
+    @staticmethod
+    def _directory_has_code_files(directory: str) -> bool:
+        if not directory or not os.path.exists(directory):
+            return False
+        for root, _, files in os.walk(directory):
+            for name in files:
+                if name.endswith((".java", ".kt", ".smali")):
+                    return True
+        return False
+
     def decompile(self, apk_path: str, scan_id: str) -> dict:
         """
         Decompile an APK file using apktool and jadx.
@@ -66,11 +76,14 @@ class Decompiler:
         # --- Step 1: apktool (decode resources + manifest) ---
         try:
             logger.info(f"[{scan_id}] Running apktool on {apk_path}...")
+            java_env = os.environ.copy()
+            java_env.setdefault("JAVA_TOOL_OPTIONS", "-Xms128m -Xmx768m")
             proc = subprocess.run(
                 [self.apktool_path, "d", "-f", "-o", apktool_dir, apk_path],
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 min for large APKs
+                env=java_env,
             )
             if proc.returncode == 0:
                 manifest = os.path.join(apktool_dir, "AndroidManifest.xml")
@@ -102,11 +115,14 @@ class Decompiler:
         try:
             logger.info(f"[{scan_id}] Running jadx on {apk_path}...")
             # jadx 1.5.x: NO --decompile-all. Use --show-bad-code to get partial decompilation.
+            java_env = os.environ.copy()
+            java_env.setdefault("JAVA_TOOL_OPTIONS", "-Xms128m -Xmx1024m")
             proc = subprocess.run(
-                [self.jadx_path, "--show-bad-code", "--no-res", "-d", jadx_dir, apk_path],
+                [self.jadx_path, "--show-bad-code", "--no-res", "--threads-count", "2", "-d", jadx_dir, apk_path],
                 capture_output=True,
                 text=True,
                 timeout=600,
+                env=java_env,
             )
             sources_dir = os.path.join(jadx_dir, "sources")
             if proc.returncode == 0 or os.path.exists(sources_dir):
@@ -137,7 +153,6 @@ class Decompiler:
         # --- Step 3: Fallback — plain zip extraction ---
         if not result["manifest_path"] and not result["source_dirs"]:
             try:
-                import zipfile
                 fallback_dir = os.path.join(output_dir, "zip_out")
                 os.makedirs(fallback_dir, exist_ok=True)
                 with zipfile.ZipFile(apk_path, 'r') as zf:
@@ -145,13 +160,20 @@ class Decompiler:
                 manifest = os.path.join(fallback_dir, "AndroidManifest.xml")
                 if os.path.exists(manifest):
                     result["manifest_path"] = manifest
-                for root, dirs, files in os.walk(fallback_dir):
+                has_code = False
+                has_resources = False
+                for _, _, files in os.walk(fallback_dir):
                     for f in files:
-                        if f.endswith(('.java', '.kt', '.xml', '.smali')):
-                            result["source_dirs"].append(fallback_dir)
-                            break
-                    if result["source_dirs"]:
+                        if f.endswith(('.java', '.kt', '.smali')):
+                            has_code = True
+                        elif f.endswith(('.xml', '.json', '.properties', '.yml', '.yaml', '.cfg', '.conf')):
+                            has_resources = True
+                    if has_code and has_resources:
                         break
+                if has_code:
+                    result["source_dirs"].append(fallback_dir)
+                if has_resources:
+                    result["resource_dirs"].append(fallback_dir)
                 logger.info(f"[{scan_id}] Zip fallback extraction completed.")
             except Exception as e:
                 result["errors"].append(f"Zip fallback failed: {e}")
@@ -160,14 +182,15 @@ class Decompiler:
         # De-duplicate paths in a stable order
         result["source_dirs"] = list(dict.fromkeys(result["source_dirs"]))
         result["resource_dirs"] = list(dict.fromkeys(result["resource_dirs"]))
+        has_code_output = any(self._directory_has_code_files(src) for src in result["source_dirs"])
 
         # If APK contains DEX, code extraction is mandatory for a trustworthy scan.
-        if result["dex_file_count"] > 0 and not result["source_dirs"]:
+        if result["dex_file_count"] > 0 and not has_code_output:
             result["errors"].append(
-                "Code extraction failed: APK contains DEX bytecode but no source/smali output was produced."
+                "Code extraction incomplete: APK contains DEX bytecode but no Java/smali output was produced."
             )
             result["analysis_mode"] = "incomplete"
-            result["success"] = False
+            result["success"] = bool(result["manifest_path"] or result["resource_dirs"])
         else:
             # Resource-only/split APKs can still be scanned in manifest-only mode.
             if result["dex_file_count"] == 0:

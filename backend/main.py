@@ -246,10 +246,27 @@ def _run_scan_pipeline(scan_id: str, apk_filename: str, apk_path: str) -> dict:
         })
 
     if decompile_errors:
+        error_text = " ".join(decompile_errors).lower()
+        severe_tokens = (
+            "killed",
+            "outofmemory",
+            "timed out",
+            "timeout",
+            "load failed",
+            "no classes for decompile",
+            "apktool error",
+            "jadx error",
+            "exception",
+        )
+        anl2_severity = "medium"
+        if decompile_result.get("analysis_mode") != "full" or any(token in error_text for token in severe_tokens):
+            anl2_severity = "high"
+        if files_scanned < 20:
+            anl2_severity = "critical"
         all_extra_findings.append({
             "id": "ANL002",
             "name": "Partial Analysis Due to Decompiler Errors",
-            "severity": "high" if files_scanned < 20 else "medium",
+            "severity": anl2_severity,
             "confidence": "high",
             "owasp": "M8",
             "location": "Decompiler",
@@ -257,6 +274,23 @@ def _run_scan_pipeline(scan_id: str, apk_filename: str, apk_path: str) -> dict:
             "evidence": "; ".join(decompile_errors)[:500],
             "description": "One or more decompilation stages failed or were degraded. Findings may be incomplete.",
             "remediation": "Verify apktool/jadx tooling in deployment logs and re-run scan with a valid base APK.",
+        })
+
+    if decompile_result.get("analysis_mode") == "incomplete":
+        all_extra_findings.append({
+            "id": "ANL003",
+            "name": "Code Extraction Incomplete For DEX APK",
+            "severity": "critical",
+            "confidence": "high",
+            "owasp": "M8",
+            "location": "Decompiler",
+            "source_type": "resource",
+            "evidence": (
+                f"dex_file_count={decompile_result.get('dex_file_count', 0)}, "
+                f"files_scanned={files_scanned}"
+            ),
+            "description": "APK contains executable DEX bytecode, but Java/smali extraction did not complete. Security coverage is incomplete.",
+            "remediation": "Fix jadx/apktool runtime limits (memory/timeout), then re-run scan on the same APK.",
         })
 
     report_data = aggregate_findings(
