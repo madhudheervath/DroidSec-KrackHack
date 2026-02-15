@@ -494,7 +494,7 @@ export default function ReportPage() {
                                             <PolarRadiusAxis tick={{ fill: '#4a4a6a', fontSize: 9 }} />
                                             <Radar name="Findings" dataKey="count" stroke="#7c5cfc" fill="#7c5cfc" fillOpacity={0.25} strokeWidth={2} />
                                             <Tooltip contentStyle={{ background: '#1a1a2e', border: '1px solid #252540', borderRadius: 8, fontSize: 11 }}
-                                                     formatter={(v: number, _: string, p: any) => [v, p.payload.name]} />
+                                                     formatter={((v: any, _: any, p: any) => [v ?? 0, p?.payload?.name]) as any} />
                                         </RadarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -507,7 +507,7 @@ export default function ReportPage() {
                                             <XAxis type="number" tick={{ fill: '#7878a0', fontSize: 10 }} />
                                             <YAxis type="category" dataKey="subject" tick={{ fill: '#7878a0', fontSize: 10 }} width={35} />
                                             <Tooltip contentStyle={{ background: '#1a1a2e', border: '1px solid #252540', borderRadius: 8, fontSize: 11 }}
-                                                     formatter={(v: number, _: string, p: any) => [v, p.payload.name]} />
+                                                     formatter={((v: any, _: any, p: any) => [v ?? 0, p?.payload?.name]) as any} />
                                             <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                                                 {owaspData.map((e, i) => (
                                                     <Cell key={i} fill={e.max_severity === 'critical' ? '#ef4444' : e.max_severity === 'high' ? '#f97316' : e.max_severity === 'medium' ? '#eab308' : e.count > 0 ? '#3b82f6' : '#1e1e3a'} />
