@@ -11,6 +11,7 @@ from typing import List, Dict
 # Per-rule caps to prevent noise
 _MAX_DEEP001 = 3   # Custom URL schemes — beyond 3, just summarize
 _MAX_DEEP002 = 3   # App links without auto-verify
+_MAX_DEEP003 = 2   # Wildcard/empty host patterns can be noisy
 _MAX_DEEP004 = 2   # Exported activities without intent filter
 _MAX_DEEP005 = 1   # Unprotected broadcast receivers
 
@@ -20,7 +21,7 @@ def analyze_deeplinks(manifest_path: str) -> List[Dict]:
     Analyze AndroidManifest.xml for deeplink security issues.
     """
     findings = []
-    _counts = {"DEEP001": 0, "DEEP002": 0, "DEEP004": 0, "DEEP005": 0}
+    _counts = {"DEEP001": 0, "DEEP002": 0, "DEEP003": 0, "DEEP004": 0, "DEEP005": 0}
 
     if not manifest_path or not os.path.exists(manifest_path):
         return findings
@@ -95,19 +96,22 @@ def analyze_deeplinks(manifest_path: str) -> List[Dict]:
 
                 # Deeplink with wildcard host
                 if host in ('*', '') and scheme in ('http', 'https'):
-                    findings.append({
-                        "id": "DEEP003",
-                        "name": "Wildcard Deeplink Host",
-                        "severity": "high",
-                        "confidence": "high",
-                        "owasp": "M3",
-                        "location": f"AndroidManifest.xml → {activity_name}",
-                        "evidence": f"scheme=\"{scheme}\" host=\"{host or '*'}\"",
-                        "description": "The deeplink uses a wildcard or empty host, which means it will "
-                                     "intercept ALL URLs with this scheme. This is extremely dangerous "
-                                     "and can interfere with other apps.",
-                        "remediation": "Specify an exact host for the deeplink instead of using wildcards.",
-                    })
+                    _counts["DEEP003"] += 1
+                    if _counts["DEEP003"] <= _MAX_DEEP003:
+                        has_browsable = "android.intent.category.BROWSABLE" in categories
+                        findings.append({
+                            "id": "DEEP003",
+                            "name": "Wildcard/Empty Deeplink Host",
+                            "severity": "high" if has_browsable else "medium",
+                            "confidence": "high" if has_browsable else "medium",
+                            "owasp": "M3",
+                            "location": f"AndroidManifest.xml → {activity_name}",
+                            "evidence": f"scheme=\"{scheme}\" host=\"{host or '*'}\" browsable={has_browsable}",
+                            "description": "The deeplink uses a wildcard or empty host. "
+                                         "This broadens intent matching and can increase interception risk, "
+                                         "especially for BROWSABLE web intents.",
+                            "remediation": "Specify an exact trusted host and restrict intent-filter scope.",
+                        })
 
         # Check for activities with no intent filters but still exported
         if exported == "true" and not activity.findall('intent-filter'):

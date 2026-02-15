@@ -164,9 +164,11 @@ def _is_false_positive(match_text: str, line_text: str = "") -> bool:
 
 
 def _should_skip_dir(dirpath: str) -> bool:
-    normalized = dirpath.replace("\\", "/")
+    normalized = (dirpath or "").replace("\\", "/").lstrip("./").lstrip("/").strip()
+    if not normalized or normalized == ".":
+        return False
     for skip in SKIP_DIRS:
-        if f"/{skip}/" in normalized or normalized.endswith(f"/{skip}"):
+        if normalized == skip or normalized.startswith(f"{skip}/"):
             return True
     return False
 
@@ -198,21 +200,19 @@ def _should_scan_smali(source_dirs: List[str]) -> bool:
 
 
 def _is_vendor_smali_path(rel_path: str) -> bool:
-    normalized = (rel_path or "").replace("\\", "/")
+    normalized = (rel_path or "").replace("\\", "/").lstrip("./").lstrip("/")
     for prefix in SMALI_VENDOR_PREFIXES:
-        if normalized.startswith(prefix):
-            return True
-        if f"/{prefix}" in normalized:
+        prefix_clean = prefix.strip("/")
+        if normalized == prefix_clean or normalized.startswith(f"{prefix_clean}/"):
             return True
     return False
 
 
 def _is_likely_third_party_path(rel_path: str) -> bool:
-    normalized = (rel_path or "").replace("\\", "/")
+    normalized = (rel_path or "").replace("\\", "/").lstrip("./").lstrip("/")
     for prefix in THIRD_PARTY_PATH_PREFIXES:
-        if normalized.startswith(prefix):
-            return True
-        if f"/{prefix}" in normalized:
+        prefix_clean = prefix.strip("/")
+        if normalized == prefix_clean or normalized.startswith(f"{prefix_clean}/"):
             return True
     return False
 
@@ -364,7 +364,9 @@ def scan_source_code(source_dirs: List[str], resource_dirs: List[str] = None) ->
         for dirpath, dirnames, filenames in os.walk(scan_dir):
             dirnames.sort()
             filenames.sort()
-            if _should_skip_dir(dirpath):
+            rel_dir = _get_relative_path(dirpath, base_dir)
+            if _should_skip_dir(rel_dir):
+                dirnames[:] = []
                 continue
 
             for filename in filenames:

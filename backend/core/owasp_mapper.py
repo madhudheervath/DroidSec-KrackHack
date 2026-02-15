@@ -28,20 +28,21 @@ OWASP_CATEGORIES = {
     "M10": "Insufficient Cryptography",
 }
 
-# Weights: Only critical findings have a major impact.
-# High findings are moderate, medium is mild, info is zero.
+# Weights tuned for security triage realism:
+# - Critical and high findings should materially impact score.
+# - Medium findings still matter when repeated.
 SEVERITY_WEIGHTS = {
-    "critical": 15,
-    "high": 5,
-    "medium": 1,
+    "critical": 20,
+    "high": 12,
+    "medium": 3,
     "info": 0,
 }
 
-# Confidence multipliers — low-confidence findings should barely move the score
+# Confidence multipliers — discount uncertainty without neutralizing risk.
 CONFIDENCE_MULTIPLIERS = {
     "high": 1.0,
-    "medium": 0.4,
-    "low": 0.1,
+    "medium": 0.7,
+    "low": 0.35,
 }
 
 # Findings from third-party libraries should not dominate app-code scoring
@@ -49,10 +50,17 @@ CONFIDENCE_MULTIPLIERS = {
 SOURCE_MULTIPLIERS = {
     "first_party": 1.0,
     "manifest": 1.0,
-    "resource": 0.8,
-    "smali_fallback": 0.9,
-    "third_party": 0.25,
-    "unknown": 0.7,
+    "resource": 0.9,
+    "smali_fallback": 0.95,
+    "third_party": 0.35,
+    "unknown": 0.8,
+}
+
+RULE_PENALTY_CAPS = {
+    "critical": 28,
+    "high": 20,
+    "medium": 10,
+    "info": 2,
 }
 
 
@@ -104,7 +112,8 @@ def calculate_security_score(findings: List[Dict], files_scanned: int = 0) -> Di
     for f in normalized_findings:
         grouped[(f.get("id", "UNKNOWN"), f.get("dedup_key", ""))].append(f)
 
-    total_penalty = 0
+    rule_penalties = defaultdict(float)
+    rule_caps = defaultdict(lambda: RULE_PENALTY_CAPS["medium"])
     for _, group in grouped.items():
         # Take the highest severity in the group
         best = max(group, key=lambda f: SEVERITY_WEIGHTS.get(f.get("severity", "info"), 0.5))
@@ -123,25 +132,57 @@ def calculate_security_score(findings: List[Dict], files_scanned: int = 0) -> Di
         count = len(group)
         effective_count = 1 + math.log2(count) if count > 1 else 1
 
-        total_penalty += weight * confidence_mult * source_mult * effective_count
+        rule_id = str(best.get("id", "UNKNOWN"))
+        penalty = weight * confidence_mult * source_mult * effective_count
+        rule_penalties[rule_id] += penalty
+        cap = RULE_PENALTY_CAPS.get(best.get("severity", "medium"), RULE_PENALTY_CAPS["medium"])
+        rule_caps[rule_id] = max(rule_caps.get(rule_id, cap), cap)
+
+    # Prevent a single noisy rule from dominating the entire score.
+    total_penalty = sum(min(rule_penalties[rid], rule_caps[rid]) for rid in rule_penalties)
 
     # --- App-size normalization ---
-    # Large apps (e.g., Telegram with 6470+ Java files) naturally have more findings.
-    # A fair scoring divisor scales with app size.
+    # Large apps naturally produce more findings. Keep normalization, but avoid over-softening.
     if files_scanned > 2000:
-        divisor = 350
+        divisor = 170
     elif files_scanned > 1000:
-        divisor = 280
+        divisor = 145
     elif files_scanned > 500:
-        divisor = 200
+        divisor = 120
     elif files_scanned > 100:
-        divisor = 140
+        divisor = 95
     else:
-        divisor = 80
+        divisor = 75
 
     # Score = 100 * e^(-penalty/divisor)
     raw_score = 100 * math.exp(-total_penalty / divisor)
     score = round(max(5, min(95, raw_score)))
+
+    # Guardrails: critical or malware-centric behavior should not receive top grades.
+    severity_rank = {"critical": 3, "high": 2, "medium": 1, "info": 0}
+    unique_by_key = {}
+    for f in normalized_findings:
+        key = f.get("dedup_key") or f.get("id", "UNKNOWN")
+        prev = unique_by_key.get(key)
+        if not prev or severity_rank.get(f.get("severity", "info"), 0) > severity_rank.get(prev.get("severity", "info"), 0):
+            unique_by_key[key] = f
+
+    unique_findings = list(unique_by_key.values())
+    critical_unique = sum(1 for f in unique_findings if f.get("severity") == "critical")
+    high_unique = sum(1 for f in unique_findings if f.get("severity") == "high")
+    malware_unique = [f for f in unique_findings if str(f.get("id", "")).upper().startswith("MAL")]
+    malware_high = sum(1 for f in malware_unique if f.get("severity") in ("high", "critical"))
+
+    if critical_unique >= 1:
+        score = min(score, 68)
+    if high_unique >= 6:
+        score = min(score, 80)
+    if malware_high >= 1:
+        score = min(score, 72)
+    if malware_high >= 2:
+        score = min(score, 58)
+    if malware_high >= 3 or (critical_unique >= 2 and malware_unique):
+        score = min(score, 45)
 
     # Grade assignment
     if score >= 85:

@@ -21,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from core.decompiler import Decompiler
 from core.manifest_analyzer import analyze_manifest
 from core.code_scanner import scan_source_code
-from core.owasp_mapper import aggregate_findings, analyze_permissions
+from core.owasp_mapper import aggregate_findings, analyze_permissions, calculate_security_score
 from core.report_generator import save_report, generate_html_report, generate_json_report
 from core.ai_analyzer import get_ai_analyzer, set_api_key
 from rules.malware import analyze_malware_heuristics
@@ -84,6 +84,29 @@ def _find_report_file(scan_id: str, filename: str) -> Optional[str]:
         if os.path.exists(path):
             return path
     return None
+
+
+def _recompute_report_score(report_data: dict) -> dict:
+    """Refresh score/severity fields from stored findings so scoring updates apply to old reports."""
+    findings = report_data.get("findings") or []
+    if not isinstance(findings, list) or not findings:
+        return report_data
+
+    files_scanned = report_data.get("files_scanned", 0)
+    report_data["security_score"] = calculate_security_score(findings, files_scanned=files_scanned)
+
+    # Preserve historical totals when present (older reports may store raw counts
+    # while findings list is deduplicated/capped for display).
+    if not report_data.get("severity_breakdown"):
+        report_data["severity_breakdown"] = {
+            "critical": sum(1 for f in findings if f.get("severity") == "critical"),
+            "high": sum(1 for f in findings if f.get("severity") == "high"),
+            "medium": sum(1 for f in findings if f.get("severity") == "medium"),
+            "info": sum(1 for f in findings if f.get("severity") == "info"),
+        }
+    if not report_data.get("total_findings"):
+        report_data["total_findings"] = len(findings)
+    return report_data
 
 
 @app.get("/")
@@ -251,12 +274,15 @@ async def scan_apk(file: UploadFile = File(...)):
 def get_report(scan_id: str):
     """Get a previously generated report."""
     if scan_id in scans:
+        scans[scan_id] = _recompute_report_score(scans[scan_id])
         return JSONResponse(content=scans[scan_id])
 
     json_path = _find_report_file(scan_id, "report.json")
     if json_path:
         with open(json_path) as f:
-            return JSONResponse(content=json.load(f))
+            data = json.load(f)
+        data = _recompute_report_score(data)
+        return JSONResponse(content=data)
 
     raise HTTPException(404, "Report not found")
 
@@ -297,6 +323,16 @@ def list_scans():
             "total_findings": data.get("total_findings", 0),
         })
     return results
+
+
+@app.get("/api/batch-status")
+def batch_status():
+    """Compatibility endpoint for frontend pollers."""
+    running = list(active_scans.values())
+    return {
+        "running": len(running),
+        "active_scans": running,
+    }
 
 
 # ============================================
@@ -411,6 +447,7 @@ def get_reports():
             try:
                 with open(report_path) as f:
                     data = json.load(f)
+                data = _recompute_report_score(data)
                 ts = data.get("timestamp") or datetime.utcfromtimestamp(os.path.getmtime(report_path)).isoformat()
                 reports.append({
                     "scan_id": scan_id,

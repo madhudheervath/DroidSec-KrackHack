@@ -82,6 +82,17 @@ npm install
 npm run dev
 ```
 
+### Local One-Command Start
+
+```bash
+cd DroidSec
+chmod +x start.sh
+./start.sh
+```
+
+This starts backend on `127.0.0.1:8000` and frontend on `${PORT:-3000}`.
+For local development with HMR, prefer running backend/frontend separately as shown above.
+
 ### Usage
 1. Open **http://localhost:3000** in your browser
 2. Drag & drop an APK file (or click to browse)
@@ -116,6 +127,39 @@ curl http://localhost:8000/api/report/{scan_id}
 
 # Download HTML report
 curl http://localhost:8000/api/report/{scan_id}/download -o report.html
+```
+
+## Troubleshooting
+
+### `ModuleNotFoundError: No module named 'pydantic'`
+
+You are using system Python instead of project venv.
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Frontend `Cannot find module './682.js'` or `vendor-chunks/@swc.js`
+
+The Next.js build cache is stale/corrupted.
+
+```bash
+cd frontend
+npm run clean
+npm install
+npm run dev
+```
+
+### `Failed to proxy http://127.0.0.1:8000/api/... socket hang up`
+
+Backend is not reachable. Ensure backend is running first, or set:
+
+```bash
+NEXT_PUBLIC_BACKEND_URL=https://<your-backend-domain>
 ```
 
 ---

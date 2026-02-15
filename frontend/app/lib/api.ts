@@ -4,13 +4,21 @@ export function getApiBaseUrl(): string {
         return configured.replace(/\/+$/, '')
     }
 
-    // In the browser, use relative paths to allow the Next.js proxy to work
-    // This is essential for deployments behind a single-port proxy like Railway
+    const localBackend = 'http://127.0.0.1:8000'
+
+    // In local development, call backend directly so Next proxy/cache issues
+    // do not break uploads.
+    if (process.env.NODE_ENV !== 'production') {
+        return localBackend
+    }
+
+    // In production browser, keep same-origin paths so Railway serves a single domain.
     if (typeof window !== 'undefined') {
         return ''
     }
 
-    return 'http://127.0.0.1:8000'
+    // Server-side production fallback for rewrites/SSR paths.
+    return (process.env.BACKEND_INTERNAL_URL || localBackend).replace(/\/+$/, '')
 }
 
 export function apiUrl(path: string): string {
