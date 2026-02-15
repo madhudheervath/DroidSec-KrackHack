@@ -89,7 +89,11 @@ def _normalize_finding(finding: Dict[str, Any]) -> Dict[str, Any]:
     return f
 
 
-def calculate_security_score(findings: List[Dict], files_scanned: int = 0) -> Dict[str, Any]:
+def calculate_security_score(
+    findings: List[Dict],
+    files_scanned: int = 0,
+    code_files_scanned: int = 0,
+) -> Dict[str, Any]:
     """
     Calculate a 0–100 security score (100 = most secure, 0 = critically insecure).
     Uses:
@@ -142,14 +146,15 @@ def calculate_security_score(findings: List[Dict], files_scanned: int = 0) -> Di
     total_penalty = sum(min(rule_penalties[rid], rule_caps[rid]) for rid in rule_penalties)
 
     # --- App-size normalization ---
-    # Large apps naturally produce more findings. Keep normalization, but avoid over-softening.
-    if files_scanned > 2000:
+    # Normalize primarily by code files, not config/resource volume.
+    normalized_size = code_files_scanned if code_files_scanned > 0 else files_scanned
+    if normalized_size > 2000:
         divisor = 170
-    elif files_scanned > 1000:
+    elif normalized_size > 1000:
         divisor = 145
-    elif files_scanned > 500:
+    elif normalized_size > 500:
         divisor = 120
-    elif files_scanned > 100:
+    elif normalized_size > 100:
         divisor = 95
     else:
         divisor = 75
@@ -257,7 +262,8 @@ def _generate_summary(findings: List[Dict], score: int, grade: str) -> str:
 def aggregate_findings(manifest_findings: List[Dict], code_findings: List[Dict],
                        permission_findings: List[Dict] = None,
                        malware_findings: List[Dict] = None,
-                       files_scanned: int = 0) -> Dict[str, Any]:
+                       files_scanned: int = 0,
+                       code_files_scanned: int = 0) -> Dict[str, Any]:
     """
     Combine all findings, deduplicate, and calculate stats.
     """
@@ -269,7 +275,11 @@ def aggregate_findings(manifest_findings: List[Dict], code_findings: List[Dict],
     raw_findings = [_normalize_finding(finding) for finding in raw_findings]
 
     # Calculation uses the full list + app size for normalization
-    score_data = calculate_security_score(raw_findings, files_scanned=files_scanned)
+    score_data = calculate_security_score(
+        raw_findings,
+        files_scanned=files_scanned,
+        code_files_scanned=code_files_scanned,
+    )
 
     # --- Deduplication for display ---
     grouped = defaultdict(list)

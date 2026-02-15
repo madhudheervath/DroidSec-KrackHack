@@ -11,6 +11,7 @@ export default function UploadZone() {
     const [isDragging, setIsDragging] = useState(false)
     const [file, setFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
+    const [scanStatusText, setScanStatusText] = useState('Decompiling bytecode & scanning heuristics')
     const [error, setError] = useState<string | null>(null)
     const router = useRouter()
 
@@ -53,6 +54,7 @@ export default function UploadZone() {
         if (!file) return
         setUploading(true)
         setError(null)
+        setScanStatusText('Uploading APK payload...')
 
         const formData = new FormData()
         formData.append('file', file)
@@ -82,7 +84,43 @@ export default function UploadZone() {
             const scanId = data.scan_id || data.metadata?.scan_id
 
             if (scanId) {
-                router.push(`/report/${scanId}`)
+                // Backward compatibility: old backend returned full report in one call.
+                if (data.security_score) {
+                    router.push(`/report/${scanId}`)
+                    return
+                }
+
+                setScanStatusText('Scan queued. Waiting for decompiler...')
+                const startedAt = Date.now()
+                const timeoutMs = 20 * 60 * 1000
+
+                while (Date.now() - startedAt < timeoutMs) {
+                    const statusRes = await fetch(apiUrl(`/api/scan/${scanId}/status`), { cache: 'no-store' })
+                    if (!statusRes.ok) {
+                        const statusText = await statusRes.text()
+                        throw new Error(statusText || 'Failed to check scan status')
+                    }
+                    const statusData = await statusRes.json()
+                    const status = String(statusData?.status || '').toLowerCase()
+
+                    if (status === 'completed') {
+                        router.push(`/report/${scanId}`)
+                        return
+                    }
+                    if (status === 'failed') {
+                        throw new Error(statusData?.error || 'Scan failed')
+                    }
+
+                    if (status === 'queued') {
+                        setScanStatusText('Scan queued. Waiting for worker slot...')
+                    } else {
+                        setScanStatusText('Decompiling and scanning...')
+                    }
+
+                    await new Promise((resolve) => setTimeout(resolve, 2500))
+                }
+
+                throw new Error('Scan timed out. Please retry.')
             } else {
                 setError("Invalid server response")
             }
@@ -91,6 +129,7 @@ export default function UploadZone() {
             setError(message)
         } finally {
             setUploading(false)
+            setScanStatusText('Decompiling bytecode & scanning heuristics')
         }
     }
 
@@ -115,7 +154,7 @@ export default function UploadZone() {
                         >
                             <Loader2 size={48} className="text-green-400 animate-spin" />
                             <h3 className="text-xl font-mono text-green-400 animate-pulse">ANALYZING APK STRUCTURE...</h3>
-                            <p className="text-gray-400 text-sm">Decompiling bytecode & scanning heuristics</p>
+                            <p className="text-gray-400 text-sm">{scanStatusText}</p>
                         </motion.div>
                     ) : file ? (
                         <motion.div

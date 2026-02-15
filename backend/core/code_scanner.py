@@ -453,4 +453,11 @@ def scan_source_code(source_dirs: List[str], resource_dirs: List[str] = None) ->
         f"({java_files} Java/Kotlin, {smali_files} smali, {config_files} config; smali_enabled={scan_smali}), "
         f"found {len(findings)} issues"
     )
-    return {"findings": findings, "files_scanned": files_scanned}
+    return {
+        "findings": findings,
+        "files_scanned": files_scanned,
+        "java_files_scanned": java_files,
+        "smali_files_scanned": smali_files,
+        "config_files_scanned": config_files,
+        "code_files_scanned": java_files + smali_files,
+    }

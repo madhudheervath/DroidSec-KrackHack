@@ -5,24 +5,22 @@ Main FastAPI application.
 import json
 import os
 import uuid
-import shutil
 import logging
-from pathlib import Path
+import threading
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from starlette.concurrency import run_in_threadpool
 
 from core.decompiler import Decompiler
 from core.manifest_analyzer import analyze_manifest
 from core.code_scanner import scan_source_code
 from core.owasp_mapper import aggregate_findings, analyze_permissions, calculate_security_score
-from core.report_generator import save_report, generate_html_report, generate_json_report
+from core.report_generator import save_report
 from core.ai_analyzer import get_ai_analyzer, set_api_key
 from rules.malware import analyze_malware_heuristics
 from rules.entropy import analyze_entropy
@@ -69,6 +67,8 @@ decompiler = Decompiler()
 # In-memory scan store (for hackathon simplicity)
 scans = {}
 active_scans = {}
+scan_lock = threading.Lock()
+scan_executor = ThreadPoolExecutor(max_workers=max(1, int(os.getenv("DROIDSEC_SCAN_WORKERS", "2"))))
 
 
 def _report_dirs() -> List[str]:
@@ -86,6 +86,22 @@ def _find_report_file(scan_id: str, filename: str) -> Optional[str]:
     return None
 
 
+def _update_scan_state(scan_id: str, **updates) -> None:
+    with scan_lock:
+        current = active_scans.get(scan_id, {"scan_id": scan_id})
+        current.update(updates)
+        active_scans[scan_id] = current
+
+
+def _finalize_scan_state(scan_id: str) -> None:
+    with scan_lock:
+        state = active_scans.get(scan_id)
+        if not state:
+            return
+        state["finished"] = True
+        active_scans[scan_id] = state
+
+
 def _recompute_report_score(report_data: dict) -> dict:
     """Refresh score/severity fields from stored findings so scoring updates apply to old reports."""
     metadata = report_data.get("metadata", {}) if isinstance(report_data.get("metadata"), dict) else {}
@@ -99,7 +115,12 @@ def _recompute_report_score(report_data: dict) -> dict:
         return report_data
 
     files_scanned = report_data.get("files_scanned", 0)
-    report_data["security_score"] = calculate_security_score(findings, files_scanned=files_scanned)
+    code_files_scanned = report_data.get("code_files_scanned", 0)
+    report_data["security_score"] = calculate_security_score(
+        findings,
+        files_scanned=files_scanned,
+        code_files_scanned=code_files_scanned,
+    )
 
     # Preserve historical totals when present (older reports may store raw counts
     # while findings list is deduplicated/capped for display).
@@ -164,6 +185,7 @@ def _run_scan_pipeline(scan_id: str, apk_filename: str, apk_path: str) -> dict:
     )
     code_findings = scan_result["findings"]
     files_scanned = scan_result["files_scanned"]
+    code_files_scanned = scan_result.get("code_files_scanned", 0)
 
     # Step 4: Analyze permissions
     logger.info(f"[{scan_id}] Analyzing permissions...")
@@ -298,7 +320,8 @@ def _run_scan_pipeline(scan_id: str, apk_filename: str, apk_path: str) -> dict:
         code_findings=code_findings,
         permission_findings=permission_findings,
         malware_findings=all_extra_findings,
-        files_scanned=files_scanned
+        files_scanned=files_scanned,
+        code_files_scanned=code_files_scanned,
     )
 
     # Add metadata
@@ -309,6 +332,10 @@ def _run_scan_pipeline(scan_id: str, apk_filename: str, apk_path: str) -> dict:
     report_data["apk_filename"] = apk_filename
     report_data["decompile_errors"] = decompile_errors
     report_data["files_scanned"] = files_scanned
+    report_data["code_files_scanned"] = code_files_scanned
+    report_data["java_files_scanned"] = scan_result.get("java_files_scanned", 0)
+    report_data["smali_files_scanned"] = scan_result.get("smali_files_scanned", 0)
+    report_data["config_files_scanned"] = scan_result.get("config_files_scanned", 0)
     report_data["analysis_mode"] = decompile_result.get("analysis_mode", "full")
     report_data["dex_file_count"] = decompile_result.get("dex_file_count", 0)
     report_data["package"] = metadata.get("package", "unknown")
@@ -325,11 +352,50 @@ def _run_scan_pipeline(scan_id: str, apk_filename: str, apk_path: str) -> dict:
     return report_data
 
 
+def _run_scan_in_background(scan_id: str, apk_filename: str, apk_path: str) -> None:
+    _update_scan_state(scan_id, status="running", started_at=datetime.utcnow().isoformat())
+    try:
+        report_data = _run_scan_pipeline(scan_id, apk_filename, apk_path)
+        _update_scan_state(
+            scan_id,
+            status="completed",
+            completed_at=datetime.utcnow().isoformat(),
+            score=report_data.get("security_score", {}).get("score"),
+            grade=report_data.get("security_score", {}).get("grade"),
+            total_findings=report_data.get("total_findings", 0),
+            report_ready=True,
+        )
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+        logger.error(f"[{scan_id}] Background scan failed: {detail}")
+        _update_scan_state(
+            scan_id,
+            status="failed",
+            completed_at=datetime.utcnow().isoformat(),
+            error=detail,
+        )
+    except Exception as exc:
+        logger.error(f"[{scan_id}] Background scan crashed: {exc}", exc_info=True)
+        _update_scan_state(
+            scan_id,
+            status="failed",
+            completed_at=datetime.utcnow().isoformat(),
+            error=f"Scan failed: {str(exc)}",
+        )
+    finally:
+        _finalize_scan_state(scan_id)
+        if os.path.exists(apk_path):
+            try:
+                os.remove(apk_path)
+            except OSError:
+                logger.warning(f"[{scan_id}] Failed to cleanup uploaded APK: {apk_path}")
+
+
 @app.post("/api/scan")
 async def scan_apk(file: UploadFile = File(...)):
     """
-    Upload an APK and run a full security scan.
-    Returns the complete security report.
+    Upload an APK and start an asynchronous security scan.
+    Returns scan_id immediately; clients should poll /api/scan/{scan_id}/status.
     """
     if not file.filename.endswith(".apk"):
         raise HTTPException(400, "Only .apk files are supported")
@@ -337,35 +403,80 @@ async def scan_apk(file: UploadFile = File(...)):
     scan_id = str(uuid.uuid4())[:8]
     apk_path = os.path.join(UPLOAD_DIR, f"{scan_id}.apk")
 
-    # Save uploaded file
+    # Save uploaded file in chunks to avoid large in-memory allocations.
     try:
+        total_bytes = 0
         with open(apk_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
-        logger.info(f"[{scan_id}] Saved APK: {file.filename} ({len(content)} bytes)")
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+                total_bytes += len(chunk)
+        logger.info(f"[{scan_id}] Saved APK: {file.filename} ({total_bytes} bytes)")
     except Exception as e:
         raise HTTPException(500, f"Failed to save file: {e}")
 
-    active_scans[scan_id] = {
+    _update_scan_state(scan_id, **{
         "scan_id": scan_id,
         "name": file.filename,
-        "started_at": datetime.utcnow().isoformat(),
-        "status": "running",
-    }
-    try:
-        report_data = await run_in_threadpool(_run_scan_pipeline, scan_id, file.filename, apk_path)
-        return JSONResponse(content=report_data)
+        "queued_at": datetime.utcnow().isoformat(),
+        "status": "queued",
+        "report_ready": False,
+        "finished": False,
+    })
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[{scan_id}] Scan failed: {e}", exc_info=True)
-        raise HTTPException(500, f"Scan failed: {str(e)}")
-    finally:
-        active_scans.pop(scan_id, None)
-        # Cleanup APK (keep reports)
-        if os.path.exists(apk_path):
-            os.remove(apk_path)
+    scan_executor.submit(_run_scan_in_background, scan_id, file.filename, apk_path)
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "scan_id": scan_id,
+            "status": "queued",
+            "message": "Scan accepted and queued. Poll /api/scan/{scan_id}/status for progress.",
+        },
+    )
+
+
+@app.get("/api/scan/{scan_id}/status")
+def scan_status(scan_id: str):
+    """Get status for an in-progress or completed scan."""
+    state = active_scans.get(scan_id)
+    if state:
+        return state
+
+    if scan_id in scans:
+        report = scans[scan_id]
+        return {
+            "scan_id": scan_id,
+            "status": "completed",
+            "finished": True,
+            "report_ready": True,
+            "completed_at": report.get("timestamp"),
+            "score": report.get("security_score", {}).get("score"),
+            "grade": report.get("security_score", {}).get("grade"),
+            "total_findings": report.get("total_findings", 0),
+        }
+
+    json_path = _find_report_file(scan_id, "report.json")
+    if json_path:
+        try:
+            with open(json_path) as f:
+                report = json.load(f)
+            return {
+                "scan_id": scan_id,
+                "status": "completed",
+                "finished": True,
+                "report_ready": True,
+                "completed_at": report.get("timestamp"),
+                "score": report.get("security_score", {}).get("score"),
+                "grade": report.get("security_score", {}).get("grade"),
+                "total_findings": report.get("total_findings", 0),
+            }
+        except Exception:
+            pass
+
+    raise HTTPException(404, "Scan not found")
 
 
 @app.get("/api/report/{scan_id}")
@@ -426,7 +537,7 @@ def list_scans():
 @app.get("/api/batch-status")
 def batch_status():
     """Compatibility endpoint for frontend pollers."""
-    running = list(active_scans.values())
+    running = [s for s in active_scans.values() if s.get("status") in {"queued", "running"}]
     return {
         "running": len(running),
         "active_scans": running,

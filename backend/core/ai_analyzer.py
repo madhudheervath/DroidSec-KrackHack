@@ -10,14 +10,7 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger(__name__)
 
 # Providers status
-GEMINI_AVAILABLE = False
 GROQ_AVAILABLE = False
-
-try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
-except ImportError:
-    pass
 
 try:
     from groq import Groq
@@ -65,11 +58,8 @@ class AIAnalyzer:
             self._init_gemini()
 
     def _init_gemini(self):
-        if not GEMINI_AVAILABLE:
-            logger.warning("Gemini SDK not installed")
-            return
-        
         try:
+            import google.generativeai as genai
             genai.configure(api_key=self.api_key)
             self.client = genai.GenerativeModel(
                 model_name="gemini-2.0-flash",
@@ -81,6 +71,8 @@ class AIAnalyzer:
             )
             self.provider = "gemini"
             logger.info("Gemini AI initialized")
+        except ImportError:
+            logger.warning("Gemini SDK not installed")
         except Exception as e:
             logger.error(f"Failed to init Gemini: {e}")
 
