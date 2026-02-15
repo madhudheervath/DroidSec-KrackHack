@@ -29,7 +29,7 @@ RUN pip3 install --no-cache-dir --break-system-packages -r /app/backend/requirem
 
 # Setup Analysis Tools (apktool, jadx)
 COPY setup_tools.sh /app/setup_tools.sh
-RUN chmod +x /app/setup_tools.sh && ./app/setup_tools.sh
+RUN chmod +x /app/setup_tools.sh && ./setup_tools.sh
 
 # Copy Built Frontend from builder
 COPY --from=frontend-builder /app/frontend/.next /app/frontend/.next
