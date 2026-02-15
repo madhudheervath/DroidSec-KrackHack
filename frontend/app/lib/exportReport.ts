@@ -26,24 +26,40 @@ interface Report {
     }
 }
 
-/* ────────────── Color helpers ────────────── */
+/* ────────────── Color helpers (light theme for PDF) ────────────── */
+
+/* Severity badge colors — solid for readability on white */
 const SEV_COLORS: Record<string, [number, number, number]> = {
-    critical: [255, 71, 87],
-    high:     [255, 140, 66],
-    medium:   [255, 209, 102],
-    info:     [110, 198, 255],
+    critical: [200, 30, 40],
+    high:     [210, 90, 20],
+    medium:   [180, 140, 0],
+    info:     [40, 110, 180],
+}
+/* Severity badge background tints */
+const SEV_BG: Record<string, [number, number, number]> = {
+    critical: [255, 230, 232],
+    high:     [255, 240, 225],
+    medium:   [255, 248, 220],
+    info:     [225, 240, 255],
 }
 
 const GRADE_COLORS: Record<string, [number, number, number]> = {
-    A: [46, 213, 115],
-    B: [110, 198, 255],
-    C: [255, 209, 102],
-    D: [255, 140, 66],
-    F: [255, 71, 87],
+    A: [22, 160, 80],
+    B: [40, 130, 200],
+    C: [190, 150, 0],
+    D: [210, 100, 20],
+    F: [200, 35, 45],
 }
 
+/* Theme constants */
+const ACCENT:  [number, number, number] = [90, 60, 200]     // deep purple
+const HEAD_BG: [number, number, number] = [240, 237, 255]   // very light purple
+const ROW_ALT: [number, number, number] = [248, 248, 252]   // subtle gray stripe
+const TXT:     [number, number, number] = [30, 30, 40]      // near-black body text
+const TXT_DIM: [number, number, number] = [100, 100, 115]   // gray secondary text
+
 /* ================================================================== */
-/*  PDF Export                                                         */
+/*  PDF Export  (Clean white-background professional report)           */
 /* ================================================================== */
 export function exportPDF(report: Report) {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -58,79 +74,104 @@ export function exportPDF(report: Report) {
     const findings = report.findings || []
     const meta = report.metadata || {}
     const pkg = report.package || meta.package || 'Unknown'
+    const ts = report.timestamp ? new Date(report.timestamp).toLocaleString() : new Date().toLocaleString()
 
-    /* ── Page 1: Cover ── */
-    // Dark header band
-    doc.setFillColor(8, 8, 14)
-    doc.rect(0, 0, pageW, 65, 'F')
+    /* ── Reusable helpers ── */
+    const sectionTitle = (title: string) => {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(13)
+        doc.setTextColor(ACCENT[0], ACCENT[1], ACCENT[2])
+        doc.text(title, margin, y)
+        doc.setDrawColor(ACCENT[0], ACCENT[1], ACCENT[2])
+        doc.setLineWidth(0.4)
+        doc.line(margin, y + 2, margin + doc.getTextWidth(title), y + 2)
+        y += 8
+    }
 
-    // Accent line
-    doc.setFillColor(139, 108, 255)
-    doc.rect(0, 65, pageW, 1.5, 'F')
+    const tableDefaults = () => ({
+        margin: { left: margin, right: margin },
+        theme: 'striped' as const,
+        styles: {
+            fontSize: 9,
+            textColor: TXT as [number, number, number],
+            cellPadding: 3,
+            lineColor: [220, 220, 230] as [number, number, number],
+            lineWidth: 0.2,
+        },
+        headStyles: {
+            fillColor: HEAD_BG as [number, number, number],
+            textColor: ACCENT as [number, number, number],
+            fontStyle: 'bold' as const,
+            lineColor: [200, 195, 230] as [number, number, number],
+            lineWidth: 0.3,
+        },
+        alternateRowStyles: { fillColor: ROW_ALT as [number, number, number] },
+    })
 
-    // Title
+    /* ═══════════════════════════════════════════════════════════════ */
+    /*  PAGE 1 — Cover                                                */
+    /* ═══════════════════════════════════════════════════════════════ */
+
+    // Header band
+    doc.setFillColor(ACCENT[0], ACCENT[1], ACCENT[2])
+    doc.rect(0, 0, pageW, 50, 'F')
+
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(28)
-    doc.text('DROIDSEC', margin, 28)
+    doc.setFontSize(26)
+    doc.text('DROIDSEC', margin, 22)
     doc.setFontSize(10)
-    doc.setTextColor(160, 160, 200)
-    doc.text('APK SECURITY ANALYSIS REPORT', margin, 36)
+    doc.setTextColor(220, 215, 255)
+    doc.text('APK SECURITY ANALYSIS REPORT', margin, 30)
 
-    // Timestamp right-aligned
+    // Right-aligned meta
     doc.setFontSize(8)
-    doc.setTextColor(120, 120, 160)
-    const ts = report.timestamp ? new Date(report.timestamp).toLocaleString() : new Date().toLocaleString()
-    doc.text(ts, pageW - margin, 28, { align: 'right' })
-    doc.text(`Report ID: ${report.scan_id || 'N/A'}`, pageW - margin, 34, { align: 'right' })
+    doc.setTextColor(210, 205, 255)
+    doc.text(ts, pageW - margin, 22, { align: 'right' })
+    doc.text(`Report ID: ${report.scan_id || 'N/A'}`, pageW - margin, 28, { align: 'right' })
 
-    y = 78
+    // Thin accent line below header
+    doc.setFillColor(70, 40, 170)
+    doc.rect(0, 50, pageW, 1.2, 'F')
 
-    // Score Card
-    const gradeColor = GRADE_COLORS[score.grade] || [160, 160, 160]
-    doc.setFillColor(12, 12, 18)
-    doc.roundedRect(margin, y, contentW, 40, 3, 3, 'F')
+    y = 62
+
+    // ── Score Card ──
+    const gradeColor = GRADE_COLORS[score.grade] || [120, 120, 120]
+    doc.setFillColor(250, 249, 255)
+    doc.roundedRect(margin, y, contentW, 36, 3, 3, 'F')
     doc.setDrawColor(gradeColor[0], gradeColor[1], gradeColor[2])
-    doc.setLineWidth(0.5)
-    doc.roundedRect(margin, y, contentW, 40, 3, 3, 'S')
+    doc.setLineWidth(0.7)
+    doc.roundedRect(margin, y, contentW, 36, 3, 3, 'S')
 
     // Grade circle
-    const circleX = margin + 22
-    const circleY = y + 20
+    const cx = margin + 22, cy = y + 18
     doc.setFillColor(gradeColor[0], gradeColor[1], gradeColor[2])
-    doc.circle(circleX, circleY, 14, 'F')
+    doc.circle(cx, cy, 13, 'F')
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(22)
-    doc.setTextColor(0, 0, 0)
-    doc.text(score.grade, circleX, circleY + 3, { align: 'center' })
-
-    // Score text
-    doc.setTextColor(240, 240, 248)
     doc.setFontSize(20)
-    doc.text(`${score.score}/100`, margin + 45, y + 16)
+    doc.setTextColor(255, 255, 255)
+    doc.text(score.grade, cx, cy + 3, { align: 'center' })
+
+    // Score info
+    doc.setTextColor(TXT[0], TXT[1], TXT[2])
+    doc.setFontSize(18)
+    doc.text(`${score.score}/100`, margin + 44, y + 14)
     doc.setFontSize(10)
     doc.setTextColor(gradeColor[0], gradeColor[1], gradeColor[2])
-    doc.text(score.risk_level || 'Unknown Risk', margin + 45, y + 24)
+    doc.text(score.risk_level || 'Unknown Risk', margin + 44, y + 22)
     doc.setFontSize(8)
-    doc.setTextColor(160, 160, 180)
-    doc.text(`${report.total_findings || findings.length} findings identified`, margin + 45, y + 32)
+    doc.setTextColor(TXT_DIM[0], TXT_DIM[1], TXT_DIM[2])
+    doc.text(`${report.total_findings || findings.length} findings identified`, margin + 44, y + 29)
 
-    y += 50
+    y += 46
 
-    // App Info table
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
-    doc.setTextColor(139, 108, 255)
-    doc.text('APPLICATION DETAILS', margin, y)
-    y += 6
+    // ── Application Details ──
+    sectionTitle('APPLICATION DETAILS')
 
     autoTable(doc, {
+        ...tableDefaults(),
         startY: y,
-        margin: { left: margin, right: margin },
-        theme: 'plain',
-        styles: { fontSize: 9, textColor: [200, 200, 220], cellPadding: 3 },
-        headStyles: { fillColor: [15, 15, 24], textColor: [139, 108, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [10, 10, 16] },
         body: [
             ['Package', pkg],
             ['APK File', report.apk_filename || 'N/A'],
@@ -141,122 +182,97 @@ export function exportPDF(report: Report) {
             ['Scan Date', ts],
         ],
         columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 45, textColor: [160, 160, 200] },
+            0: { fontStyle: 'bold', cellWidth: 45, textColor: ACCENT as [number, number, number] },
             1: { cellWidth: contentW - 45 },
         },
     })
 
-    y = (doc as any).lastAutoTable.finalY + 10
+    y = (doc as any).lastAutoTable.finalY + 12
 
-    // Severity Breakdown
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
-    doc.setTextColor(139, 108, 255)
-    doc.text('SEVERITY BREAKDOWN', margin, y)
-    y += 6
-
-    const sevData = [
-        ['Critical', String(breakdown.critical || 0), 'Immediate exploitation risk'],
-        ['High', String(breakdown.high || 0), 'Significant security impact'],
-        ['Medium', String(breakdown.medium || 0), 'Moderate risk, should fix'],
-        ['Info', String(breakdown.info || 0), 'Best practice recommendation'],
-    ]
+    // ── Severity Breakdown ──
+    sectionTitle('SEVERITY BREAKDOWN')
 
     autoTable(doc, {
+        ...tableDefaults(),
         startY: y,
-        margin: { left: margin, right: margin },
         head: [['Severity', 'Count', 'Impact']],
-        body: sevData,
-        theme: 'plain',
-        styles: { fontSize: 9, textColor: [200, 200, 220], cellPadding: 3 },
-        headStyles: { fillColor: [15, 15, 24], textColor: [139, 108, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [10, 10, 16] },
+        body: [
+            ['Critical', String(breakdown.critical || 0), 'Immediate exploitation risk'],
+            ['High', String(breakdown.high || 0), 'Significant security impact'],
+            ['Medium', String(breakdown.medium || 0), 'Moderate risk, should fix'],
+            ['Info', String(breakdown.info || 0), 'Best practice recommendation'],
+        ],
         didParseCell: (data: any) => {
             if (data.section === 'body' && data.column.index === 0) {
                 const sev = data.cell.raw?.toString()?.toLowerCase() || ''
-                const color = SEV_COLORS[sev]
-                if (color) data.cell.styles.textColor = color
+                const c = SEV_COLORS[sev]; const bg = SEV_BG[sev]
+                if (c) { data.cell.styles.textColor = c; data.cell.styles.fontStyle = 'bold' }
+                if (bg) data.cell.styles.fillColor = bg
             }
         },
     })
 
-    y = (doc as any).lastAutoTable.finalY + 10
+    y = (doc as any).lastAutoTable.finalY + 12
 
-    // OWASP Coverage
+    // ── OWASP Coverage ──
     const owaspData = report.owasp_breakdown
     if (owaspData && Object.keys(owaspData).length > 0) {
         if (y > pageH - 60) { doc.addPage(); y = margin }
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(12)
-        doc.setTextColor(139, 108, 255)
-        doc.text('OWASP MOBILE TOP 10 COVERAGE', margin, y)
-        y += 6
-
-        const owaspRows = Object.entries(owaspData).map(([code, cat]) => [
-            code,
-            cat.name,
-            String(cat.count),
-            cat.max_severity || '-',
-        ])
+        sectionTitle('OWASP MOBILE TOP 10 COVERAGE')
 
         autoTable(doc, {
+            ...tableDefaults(),
             startY: y,
-            margin: { left: margin, right: margin },
             head: [['Code', 'Category', 'Findings', 'Max Severity']],
-            body: owaspRows,
-            theme: 'plain',
-            styles: { fontSize: 8, textColor: [200, 200, 220], cellPadding: 2.5 },
-            headStyles: { fillColor: [15, 15, 24], textColor: [139, 108, 255], fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [10, 10, 16] },
-            columnStyles: { 0: { cellWidth: 18, fontStyle: 'bold' } },
+            body: Object.entries(owaspData).map(([code, cat]) => [
+                code, cat.name, String(cat.count), cat.max_severity || '-',
+            ]),
+            styles: { ...tableDefaults().styles, fontSize: 8.5, cellPadding: 2.8 },
+            columnStyles: { 0: { cellWidth: 18, fontStyle: 'bold', textColor: ACCENT as [number, number, number] } },
             didParseCell: (data: any) => {
                 if (data.section === 'body' && data.column.index === 3) {
                     const sev = data.cell.raw?.toString()?.toLowerCase() || ''
-                    const color = SEV_COLORS[sev]
-                    if (color) data.cell.styles.textColor = color
+                    const c = SEV_COLORS[sev]
+                    if (c) { data.cell.styles.textColor = c; data.cell.styles.fontStyle = 'bold' }
                 }
             },
         })
 
-        y = (doc as any).lastAutoTable.finalY + 10
+        y = (doc as any).lastAutoTable.finalY + 12
     }
 
-    /* ── Findings Detail Pages ── */
+    /* ═══════════════════════════════════════════════════════════════ */
+    /*  FINDINGS DETAIL PAGES                                         */
+    /* ═══════════════════════════════════════════════════════════════ */
     if (findings.length > 0) {
         doc.addPage()
         y = margin
 
-        doc.setFillColor(8, 8, 14)
-        doc.rect(0, 0, pageW, 20, 'F')
-        doc.setFillColor(139, 108, 255)
-        doc.rect(0, 20, pageW, 0.8, 'F')
-
+        // Mini header bar
+        doc.setFillColor(ACCENT[0], ACCENT[1], ACCENT[2])
+        doc.rect(0, 0, pageW, 18, 'F')
         doc.setFont('helvetica', 'bold')
-        doc.setFontSize(14)
+        doc.setFontSize(13)
         doc.setTextColor(255, 255, 255)
-        doc.text('DETAILED FINDINGS', margin, 14)
-        y = 28
-
-        const findingRows = findings.map((f, i) => [
-            String(i + 1),
-            f.severity?.toUpperCase() || '?',
-            f.name || 'Unknown',
-            f.owasp || '-',
-            f.location || '-',
-            (f.description || '').substring(0, 80) + ((f.description || '').length > 80 ? '...' : ''),
-        ])
+        doc.text('DETAILED FINDINGS', margin, 12)
+        y = 24
 
         autoTable(doc, {
+            ...tableDefaults(),
             startY: y,
-            margin: { left: margin, right: margin },
             head: [['#', 'Severity', 'Finding', 'OWASP', 'Location', 'Description']],
-            body: findingRows,
-            theme: 'plain',
-            styles: { fontSize: 7, textColor: [200, 200, 220], cellPadding: 2, overflow: 'linebreak' },
-            headStyles: { fillColor: [15, 15, 24], textColor: [139, 108, 255], fontStyle: 'bold', fontSize: 7.5 },
-            alternateRowStyles: { fillColor: [10, 10, 16] },
+            body: findings.map((f, i) => [
+                String(i + 1),
+                f.severity?.toUpperCase() || '?',
+                f.name || 'Unknown',
+                f.owasp || '-',
+                f.location || '-',
+                (f.description || '').substring(0, 80) + ((f.description || '').length > 80 ? '...' : ''),
+            ]),
+            styles: { ...tableDefaults().styles, fontSize: 7.5, cellPadding: 2.2, overflow: 'linebreak' as const },
+            headStyles: { ...tableDefaults().headStyles, fontSize: 8 },
             columnStyles: {
-                0: { cellWidth: 8, halign: 'center' },
+                0: { cellWidth: 8, halign: 'center' as const },
                 1: { cellWidth: 16 },
                 2: { cellWidth: 38 },
                 3: { cellWidth: 16 },
@@ -266,16 +282,15 @@ export function exportPDF(report: Report) {
             didParseCell: (data: any) => {
                 if (data.section === 'body' && data.column.index === 1) {
                     const sev = data.cell.raw?.toString()?.toLowerCase() || ''
-                    const color = SEV_COLORS[sev]
-                    if (color) data.cell.styles.textColor = color
-                    data.cell.styles.fontStyle = 'bold'
+                    const c = SEV_COLORS[sev]
+                    if (c) { data.cell.styles.textColor = c; data.cell.styles.fontStyle = 'bold' }
                 }
             },
         })
 
         y = (doc as any).lastAutoTable.finalY + 12
 
-        // Detailed evidence & remediation for critical/high findings
+        // ── High-priority findings with evidence & fix ──
         const importantFindings = findings.filter(f =>
             ['critical', 'high'].includes((f.severity || '').toLowerCase())
         )
@@ -285,29 +300,30 @@ export function exportPDF(report: Report) {
 
             doc.setFont('helvetica', 'bold')
             doc.setFontSize(12)
-            doc.setTextColor(255, 82, 82)
+            doc.setTextColor(SEV_COLORS.critical[0], SEV_COLORS.critical[1], SEV_COLORS.critical[2])
             doc.text('HIGH-PRIORITY FINDINGS — DETAIL', margin, y)
             y += 8
 
             for (const f of importantFindings) {
                 if (y > pageH - 50) { doc.addPage(); y = margin }
 
-                const sevColor = SEV_COLORS[(f.severity || '').toLowerCase()] || [200, 200, 200]
+                const sevColor = SEV_COLORS[(f.severity || '').toLowerCase()] || [80, 80, 80]
+                const sevBg = SEV_BG[(f.severity || '').toLowerCase()] || [245, 245, 245]
 
-                // Finding header
-                doc.setFillColor(12, 12, 18)
+                // Title bar
+                doc.setFillColor(sevBg[0], sevBg[1], sevBg[2])
                 doc.roundedRect(margin, y, contentW, 8, 1.5, 1.5, 'F')
                 doc.setDrawColor(sevColor[0], sevColor[1], sevColor[2])
-                doc.setLineWidth(0.3)
+                doc.setLineWidth(0.4)
                 doc.roundedRect(margin, y, contentW, 8, 1.5, 1.5, 'S')
                 doc.setFont('helvetica', 'bold')
                 doc.setFontSize(9)
                 doc.setTextColor(sevColor[0], sevColor[1], sevColor[2])
-                doc.text(`[${(f.severity || '?').toUpperCase()}] ${f.name}`, margin + 3, y + 5.5)
+                doc.text(`[${(f.severity || '?').toUpperCase()}]  ${f.name}`, margin + 3, y + 5.5)
 
                 if (f.owasp) {
                     doc.setFontSize(7)
-                    doc.setTextColor(139, 108, 255)
+                    doc.setTextColor(ACCENT[0], ACCENT[1], ACCENT[2])
                     doc.text(f.owasp, pageW - margin - 3, y + 5.5, { align: 'right' })
                 }
                 y += 12
@@ -316,7 +332,7 @@ export function exportPDF(report: Report) {
                 if (f.location) {
                     doc.setFont('helvetica', 'normal')
                     doc.setFontSize(7.5)
-                    doc.setTextColor(120, 120, 170)
+                    doc.setTextColor(TXT_DIM[0], TXT_DIM[1], TXT_DIM[2])
                     doc.text(`Location: ${f.location}`, margin + 2, y)
                     y += 5
                 }
@@ -325,33 +341,42 @@ export function exportPDF(report: Report) {
                 if (f.description) {
                     doc.setFont('helvetica', 'normal')
                     doc.setFontSize(8)
-                    doc.setTextColor(200, 200, 220)
-                    const descLines = doc.splitTextToSize(f.description, contentW - 6)
-                    doc.text(descLines, margin + 2, y)
-                    y += descLines.length * 4 + 3
+                    doc.setTextColor(TXT[0], TXT[1], TXT[2])
+                    const lines = doc.splitTextToSize(f.description, contentW - 6)
+                    doc.text(lines, margin + 2, y)
+                    y += lines.length * 4 + 3
                 }
 
-                // Evidence
+                // Evidence box
                 if (f.evidence) {
-                    doc.setFillColor(6, 6, 10)
+                    doc.setFillColor(245, 245, 250)
                     const evLines = doc.splitTextToSize(`Evidence: ${f.evidence}`, contentW - 10)
-                    const evH = evLines.length * 3.5 + 4
+                    const evH = evLines.length * 3.5 + 5
                     doc.roundedRect(margin + 2, y, contentW - 4, evH, 1, 1, 'F')
+                    doc.setDrawColor(200, 195, 220)
+                    doc.setLineWidth(0.2)
+                    doc.roundedRect(margin + 2, y, contentW - 4, evH, 1, 1, 'S')
                     doc.setFont('courier', 'normal')
                     doc.setFontSize(6.5)
-                    doc.setTextColor(139, 108, 255)
-                    doc.text(evLines, margin + 5, y + 3.5)
+                    doc.setTextColor(80, 60, 150)
+                    doc.text(evLines, margin + 5, y + 4)
                     y += evH + 3
                 }
 
-                // Remediation
+                // Remediation box
                 if (f.remediation) {
+                    doc.setFillColor(235, 250, 240)
+                    const remLines = doc.splitTextToSize(`Fix: ${f.remediation}`, contentW - 10)
+                    const remH = remLines.length * 3.8 + 5
+                    doc.roundedRect(margin + 2, y, contentW - 4, remH, 1, 1, 'F')
+                    doc.setDrawColor(160, 220, 180)
+                    doc.setLineWidth(0.2)
+                    doc.roundedRect(margin + 2, y, contentW - 4, remH, 1, 1, 'S')
                     doc.setFont('helvetica', 'normal')
                     doc.setFontSize(7.5)
-                    doc.setTextColor(46, 213, 115)
-                    const remLines = doc.splitTextToSize(`Fix: ${f.remediation}`, contentW - 6)
-                    doc.text(remLines, margin + 2, y)
-                    y += remLines.length * 3.8 + 6
+                    doc.setTextColor(20, 120, 60)
+                    doc.text(remLines, margin + 5, y + 4)
+                    y += remH + 4
                 }
 
                 y += 4
@@ -359,16 +384,18 @@ export function exportPDF(report: Report) {
         }
     }
 
-    // Footer on every page
+    // ── Footer on every page ──
     const totalPages = (doc as any).internal.getNumberOfPages()
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i)
-        doc.setFillColor(8, 8, 14)
-        doc.rect(0, pageH - 12, pageW, 12, 'F')
+        doc.setDrawColor(200, 200, 210)
+        doc.setLineWidth(0.3)
+        doc.line(margin, pageH - 14, pageW - margin, pageH - 14)
         doc.setFontSize(7)
-        doc.setTextColor(100, 100, 140)
-        doc.text('Generated by DroidSec — APK Security Analyzer', margin, pageH - 5)
-        doc.text(`Page ${i} of ${totalPages}`, pageW - margin, pageH - 5, { align: 'right' })
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(TXT_DIM[0], TXT_DIM[1], TXT_DIM[2])
+        doc.text('Generated by DroidSec — APK Security Analyzer', margin, pageH - 8)
+        doc.text(`Page ${i} of ${totalPages}`, pageW - margin, pageH - 8, { align: 'right' })
     }
 
     doc.save(`DroidSec-Report-${pkg.replace(/\./g, '_')}.pdf`)
