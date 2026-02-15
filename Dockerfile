@@ -25,7 +25,7 @@ WORKDIR /app
 # Copy Backend and install requirements
 # Using pip3 specifically for the debian environment
 COPY backend/ /app/backend/
-RUN pip3 install --no-cache-dir -r /app/backend/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /app/backend/requirements.txt
 
 # Setup Analysis Tools (apktool, jadx)
 COPY setup_tools.sh /app/setup_tools.sh
