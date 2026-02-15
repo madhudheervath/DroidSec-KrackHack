@@ -429,26 +429,6 @@ def get_reports():
     return reports
 
 
-@app.get("/api/batch-status")
-def get_batch_status():
-    """Return active scans + latest completed scans for dashboard polling."""
-    rows = []
-    for s in active_scans.values():
-        rows.append({
-            "name": s.get("name", s.get("scan_id", "running")),
-            "grade": "...",
-            "score": "...",
-            "error": False,
-        })
-
-    for report in get_reports()[:21]:
-        rows.append({
-            "name": report.get("filename") or report.get("package") or report.get("scan_id"),
-            "grade": report.get("grade", "?"),
-            "score": report.get("score", 0),
-            "error": False,
-        })
-    return JSONResponse(content=rows[:21])
 
 if __name__ == "__main__":
     import uvicorn

@@ -2,7 +2,6 @@
 
 import CyberBackground from './components/CyberBackground'
 import UploadZone from './components/UploadZone'
-import BatchStatus from './components/BatchStatus'
 import RecentScans from './components/RecentScans'
 
 export default function Home() {
@@ -27,10 +26,6 @@ export default function Home() {
           </p>
         </header>
 
-        {/* Batch Status (Automation Monitor) */}
-        <div className="w-full max-w-4xl">
-          <BatchStatus />
-        </div>
 
         {/* Upload Zone */}
         <UploadZone />
