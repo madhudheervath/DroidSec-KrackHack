@@ -357,10 +357,34 @@ export default function ReportPage() {
     const chatInputRef = useRef<HTMLTextAreaElement>(null)
     const [exportOpen, setExportOpen] = useState(false)
     const exportRef = useRef<HTMLDivElement>(null)
+    const fetchedRef = useRef(false)
+    const aiFetchedRef = useRef(false)
 
-    /* fetch report */
+    /* chat key for sessionStorage */
+    const chatKey = params.id ? `droidsec_chat_${params.id}` : ''
+
+    /* restore chat from sessionStorage on mount */
     useEffect(() => {
-        if (!params.id) return
+        if (!chatKey) return
+        try {
+            const saved = sessionStorage.getItem(chatKey)
+            if (saved) {
+                const parsed = JSON.parse(saved)
+                if (Array.isArray(parsed) && parsed.length > 0) setChatMessages(parsed)
+            }
+        } catch { /* ignore */ }
+    }, [chatKey])
+
+    /* persist chat to sessionStorage on change */
+    useEffect(() => {
+        if (!chatKey || chatMessages.length === 0) return
+        try { sessionStorage.setItem(chatKey, JSON.stringify(chatMessages)) } catch { /* quota */ }
+    }, [chatMessages, chatKey])
+
+    /* fetch report (guarded against double-mount) */
+    useEffect(() => {
+        if (!params.id || fetchedRef.current) return
+        fetchedRef.current = true
         ;(async () => {
             try {
                 const r = await fetch(apiUrl(`/api/report/${params.id}`))
@@ -371,9 +395,10 @@ export default function ReportPage() {
         })()
     }, [params.id])
 
-    /* lazy AI fetch */
+    /* lazy AI fetch (guarded) */
     useEffect(() => {
-        if (!aiOpen || ai || aiLoading || !report) return
+        if (!aiOpen || ai || aiLoading || !report || aiFetchedRef.current) return
+        aiFetchedRef.current = true
         ;(async () => {
             setAiLoading(true)
             try {
@@ -806,7 +831,7 @@ export default function ReportPage() {
                                 </div>
                                 <div className="flex items-center gap-1">
                                     {chatMessages.length > 0 && (
-                                        <button onClick={() => setChatMessages([])}
+                                        <button onClick={() => { setChatMessages([]); if (chatKey) try { sessionStorage.removeItem(chatKey) } catch {} }}
                                             className="px-2 py-1 rounded text-[10px] text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors font-bold">
                                             Clear
                                         </button>
