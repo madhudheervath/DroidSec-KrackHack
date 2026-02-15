@@ -599,7 +599,10 @@ def ai_status():
         "available": ai.is_available,
         "provider": ai.provider,
         "model": model_info,
-        "message": "AI ready" if ai.is_available else "Set API key via POST /api/ai/config"
+        "groq_key_set": bool(os.environ.get("GROQ_API_KEY")),
+        "gemini_key_set": bool(os.environ.get("GEMINI_API_KEY")),
+        "key_length": len(ai.api_key) if ai.api_key else 0,
+        "message": "AI ready" if ai.is_available else "Set GROQ_API_KEY environment variable"
     }
 
 
@@ -640,14 +643,18 @@ async def ai_chat(req: AIChatRequest):
     """Interactive AI chat about scan results."""
     ai = get_ai_analyzer()
     if not ai.is_available:
-        raise HTTPException(400, "AI not configured.")
+        raise HTTPException(400, detail="AI not configured. Set GROQ_API_KEY environment variable.")
 
     scan_data = _get_scan_data(req.scan_id)
     if scan_data is None:
-        raise HTTPException(404, "Scan not found")
+        raise HTTPException(404, detail="Scan not found")
 
-    response = await ai.chat(req.scan_id, req.message, scan_data)
-    return {"response": response}
+    try:
+        response = await ai.chat(req.scan_id, req.message, scan_data)
+        return {"response": response}
+    except Exception as e:
+        logger.error(f"AI chat error: {type(e).__name__}: {e}")
+        raise HTTPException(502, detail=f"AI service error: {type(e).__name__}: {str(e)[:200]}")
 
 
 @app.post("/api/ai/remediate")
@@ -655,19 +662,23 @@ async def ai_remediate(req: AIRemediateRequest):
     """Get AI-powered detailed remediation for a specific finding."""
     ai = get_ai_analyzer()
     if not ai.is_available:
-        raise HTTPException(400, "AI not configured.")
+        raise HTTPException(400, detail="AI not configured. Set GROQ_API_KEY environment variable.")
 
     scan_data = _get_scan_data(req.scan_id)
     if scan_data is None:
-        raise HTTPException(404, "Scan not found")
+        raise HTTPException(404, detail="Scan not found")
 
     findings = scan_data.get("findings", [])
     if req.finding_index < 0 or req.finding_index >= len(findings):
-        raise HTTPException(400, "Invalid finding index")
+        raise HTTPException(400, detail="Invalid finding index")
 
     finding = findings[req.finding_index]
-    response = await ai.generate_remediation(finding)
-    return {"remediation": response, "finding": finding.get("name", "Unknown")}
+    try:
+        response = await ai.generate_remediation(finding)
+        return {"remediation": response, "finding": finding.get("name", "Unknown")}
+    except Exception as e:
+        logger.error(f"AI remediate error: {type(e).__name__}: {e}")
+        raise HTTPException(502, detail=f"AI service error: {type(e).__name__}: {str(e)[:200]}")
 
 
 

@@ -233,11 +233,15 @@ function FindingCard({ finding, open = false, findingIndex, scanId }: { finding:
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ scan_id: scanId, finding_index: findingIndex })
             })
-            if (!res.ok) throw new Error('Failed')
+            if (!res.ok) {
+                let errMsg = 'Remediation failed'
+                try { const d = await res.json(); errMsg = d.detail || errMsg } catch {}
+                throw new Error(errMsg)
+            }
             const data = await res.json()
             setAiRem(data.remediation || 'No remediation available.')
-        } catch {
-            setAiRem('Failed to generate AI remediation. Please try again.')
+        } catch (err: any) {
+            setAiRem(`⚠️ ${err?.message || 'Failed to generate AI remediation. Please try again.'}`)
         } finally {
             setAiRemLoading(false)
         }
@@ -446,17 +450,25 @@ export default function ReportPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text, scan_id: params.id }),
             })
-            if (!res.ok) throw new Error('Chat failed')
+            if (!res.ok) {
+                let errMsg = 'Chat request failed'
+                try {
+                    const errData = await res.json()
+                    errMsg = errData.detail || errData.message || errMsg
+                } catch { /* fallback */ }
+                throw new Error(errMsg)
+            }
             const data = await res.json()
             setChatMessages(prev => [...prev, {
                 role: 'assistant',
                 content: data.response || 'No response received.',
                 timestamp: Date.now()
             }])
-        } catch {
+        } catch (err: any) {
+            const errorDetail = err?.message || 'Unknown error'
             setChatMessages(prev => [...prev, {
                 role: 'assistant',
-                content: 'Sorry, I couldn\'t process that request. Please check if the AI service is configured.',
+                content: `⚠️ **Error:** ${errorDetail}\n\nPlease check that the GROQ_API_KEY environment variable is set correctly.`,
                 timestamp: Date.now()
             }])
         } finally {

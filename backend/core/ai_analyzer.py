@@ -42,13 +42,28 @@ class AIAnalyzer:
     """Multi-provider AI security analysis (Gemini or Groq)."""
 
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
         self.provider = None
         self.client = None
         self.model_name = None
         self.chat_history: Dict[str, List[Dict]] = {} # History for Groq/OpenAI compatible
 
+        # Try multiple env var names for robustness
+        self.api_key = (
+            api_key
+            or os.environ.get("GROQ_API_KEY", "")
+            or os.environ.get("GEMINI_API_KEY", "")
+        )
+
+        # Log env var detection for debugging deployments
+        groq_present = bool(os.environ.get("GROQ_API_KEY"))
+        gemini_present = bool(os.environ.get("GEMINI_API_KEY"))
+        logger.info(f"AI init: GROQ_API_KEY={'set' if groq_present else 'missing'}, "
+                    f"GEMINI_API_KEY={'set' if gemini_present else 'missing'}, "
+                    f"key_length={len(self.api_key)}, "
+                    f"key_prefix={self.api_key[:8]}... " if self.api_key else "no key")
+
         if not self.api_key:
+            logger.warning("No AI API key found. Set GROQ_API_KEY or GEMINI_API_KEY.")
             return
 
         # Auto-detect provider
@@ -56,6 +71,11 @@ class AIAnalyzer:
             self._init_groq()
         else:
             self._init_gemini()
+
+        if self.provider:
+            logger.info(f"AI provider ready: {self.provider}")
+        else:
+            logger.error(f"AI initialization FAILED — key present but no provider configured")
 
     def _init_gemini(self):
         try:
@@ -282,12 +302,14 @@ Respond strictly with this JSON structure:
         return await self._generate(prompt)
 
 
-# Singleton
+# Singleton with retry
 _ai_analyzer: Optional[AIAnalyzer] = None
 
 def get_ai_analyzer() -> AIAnalyzer:
     global _ai_analyzer
-    if _ai_analyzer is None: _ai_analyzer = AIAnalyzer()
+    if _ai_analyzer is None or not _ai_analyzer.is_available:
+        # Retry initialization — env vars may have become available
+        _ai_analyzer = AIAnalyzer()
     return _ai_analyzer
 
 def set_api_key(api_key: str):
