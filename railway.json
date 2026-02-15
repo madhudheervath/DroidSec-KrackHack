@@ -6,7 +6,7 @@
     },
     "deploy": {
         "numReplicas": 1,
-        "healthcheckPath": "/api/scans",
+        "healthcheckPath": "/api/health",
         "healthcheckTimeout": 120,
         "restartPolicyType": "ON_FAILURE"
     }
