@@ -49,6 +49,26 @@ WEBVIEW_RULES = [
         "remediation": "Validate and sanitize all URLs before loading in WebView. Use an allowlist of trusted domains."
     },
     {
+        "id": "WEB007",
+        "name": "WebView Loading File from External Storage",
+        "pattern": r"loadUrl\s*\([^)]*\"file://\"[^)]*(?:getExternal|sdcard|Environment)",
+        "severity": "high",
+        "confidence": "high",
+        "owasp": "M8",
+        "description": "WebView loads a file:// URL from external storage. External storage files can be modified by other apps, enabling content injection into the WebView.",
+        "remediation": "Load content from internal storage or app assets. If external files must be loaded, verify file integrity before rendering."
+    },
+    {
+        "id": "WEB008",
+        "name": "WebView JavaScript Enabled with File Access",
+        "pattern": r"setJavaScriptEnabled\s*\(\s*true\s*\)",
+        "severity": "medium",
+        "confidence": "low",
+        "owasp": "M8",
+        "description": "JavaScript is enabled in WebView. If combined with file:// URL loading or unsanitized content, this can lead to cross-site scripting (XSS) or data theft.",
+        "remediation": "Only enable JavaScript when strictly required. Disable file access APIs when JavaScript is enabled."
+    },
+    {
         "id": "WEB006",
         "name": "WebView Content Access Enabled",
         "pattern": r"setAllowContentAccess\s*\(\s*true\s*\)",

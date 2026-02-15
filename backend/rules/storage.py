@@ -68,6 +68,56 @@ STORAGE_RULES = [
         "remediation": "Avoid using clipboard for sensitive data. If necessary, clear clipboard after use and set expiration."
     },
     {
+        "id": "STO008",
+        "name": "Credentials Read from SharedPreferences",
+        "pattern": r"getString\s*\(\s*\"[^\"]*(?:[Pp]assword|[Ss]ecret|[Cc]redential|[Ss]ession[_\s]?[Tt]oken|[Aa]uth[_\s]?[Tt]oken|[Ll]ogin[_\s]?[Tt]oken|superSecure)[^\"]*\"",
+        "severity": "high",
+        "confidence": "high",
+        "owasp": "M9",
+        "description": "Credentials or authentication tokens are read from SharedPreferences. Standard SharedPreferences are stored as plaintext XML, readable on rooted devices.",
+        "remediation": "Use EncryptedSharedPreferences from AndroidX Security library. Store sensitive tokens in Android Keystore."
+    },
+    {
+        "id": "STO009",
+        "name": "Sensitive Data in System Output",
+        "pattern": r"System\.out\.print(?:ln)?\s*\([^)]*(?:password|passwd|pwd|secret|credential|newpass|token|ssn)[^)]*\)",
+        "severity": "medium",
+        "confidence": "medium",
+        "owasp": "M9",
+        "description": "Sensitive data appears to be printed to System.out. This output is captured in logcat and is visible to any app on pre-API 16 devices.",
+        "remediation": "Remove all System.out.println calls containing sensitive data. Use ProGuard/R8 to strip logging in release builds."
+    },
+    {
+        "id": "STO010",
+        "name": "Sensitive Data in Broadcast Intent",
+        "pattern": r"putExtra\s*\(\s*\"[^\"]*(?:pass|secret|credential|token|auth|newpass)[^\"]*\"",
+        "severity": "high",
+        "confidence": "medium",
+        "owasp": "M9",
+        "description": "Sensitive data (password/token/credential) is placed in a broadcast Intent extra. Implicit broadcasts can be intercepted by any app with matching receiver.",
+        "remediation": "Use LocalBroadcastManager or explicit Intents with component targeting. Never send credentials via implicit broadcasts."
+    },
+    {
+        "id": "STO011",
+        "name": "Sensitive Data Written to External Storage",
+        "pattern": r"(?:FileWriter|FileOutputStream|BufferedWriter)\s*\([^)]*(?:getExternalStorageDirectory|/sdcard|Environment\.getExternal)",
+        "severity": "high",
+        "confidence": "medium",
+        "owasp": "M9",
+        "description": "Data is written to external storage which is world-readable on API < 29. Sensitive files can be accessed by any installed app.",
+        "remediation": "Write sensitive data to internal storage (getFilesDir()) instead. Encrypt files if external storage is required."
+    },
+    {
+        "id": "STO012",
+        "name": "SMS Sending with Sensitive Content",
+        "pattern": r"(?:SmsManager|sendTextMessage|sendMultipartTextMessage)\s*[.(]",
+        "severity": "high",
+        "confidence": "medium",
+        "owasp": "M6",
+        "description": "App sends SMS programmatically. SMS messages can be intercepted and are not encrypted. If sending credentials via SMS, this is a critical privacy risk.",
+        "remediation": "Avoid sending sensitive data via SMS. Use encrypted push notifications or secure API calls instead."
+    },
+    {
         "id": "STO007",
         "name": "SharedPreferences for Sensitive Data",
         "pattern": r"getSharedPreferences\s*\([^)]*\).*(?:password|token|secret|key|credential)",

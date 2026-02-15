@@ -103,4 +103,46 @@ CRYPTO_RULES = [
         "description": "Base64 encoding used in a security context. Base64 is encoding, not encryption — data is trivially reversible.",
         "remediation": "Use proper encryption (AES-GCM) instead of Base64 encoding for protecting sensitive data."
     },
+    # --- Rules below catch decompiled patterns where keys/IVs are stored
+    # --- in variables rather than inlined into API calls (common in jadx output).
+    {
+        "id": "CRY015",
+        "name": "Hardcoded Cryptographic Key String",
+        "pattern": r"(?i)(?:String\s+)?(?:secret\s*Key|encryption\s*Key|aes\s*Key|crypto\s*Key|master\s*Key|cipher\s*Key|private\s*Key|hmac\s*Key)\s*=\s*\"[^\"]{8,}\"",
+        "severity": "critical",
+        "confidence": "high",
+        "owasp": "M10",
+        "description": "A cryptographic key is hardcoded as a string literal. Attackers can extract the key by decompiling the APK and decrypt all protected data.",
+        "remediation": "Use Android Keystore to generate and store encryption keys securely. Never embed cryptographic material in source code."
+    },
+    {
+        "id": "CRY016",
+        "name": "Hardcoded Crypto Key in Variable",
+        "pattern": r"=\s*\"[^\"]*(?:secret\s*key|encrypt(?:ion)?\s*key|private\s*key|master\s*key|cipher\s*key)[^\"]*\"",
+        "severity": "critical",
+        "confidence": "high",
+        "owasp": "M10",
+        "description": "A string containing a cryptographic key phrase was found. Hardcoded keys are trivially extractable from the APK.",
+        "remediation": "Store keys in Android Keystore or derive them with PBKDF2/Argon2. Remove all key material from source code."
+    },
+    {
+        "id": "CRY017",
+        "name": "Hardcoded Static IV (All-Zeros or Constant)",
+        "pattern": r"(?i)iv\w*\s*=\s*(?:new\s+byte\s*\[\s*\]\s*)?\{(?:\s*0\s*,\s*){3,}",
+        "severity": "high",
+        "confidence": "high",
+        "owasp": "M10",
+        "description": "A static initialization vector (IV) with constant bytes (e.g., all zeros) was found. Reusing the same IV allows attackers to recover plaintext from ciphertext.",
+        "remediation": "Generate a unique random IV using SecureRandom for every encryption operation. Prepend the IV to the ciphertext for decryption."
+    },
+    {
+        "id": "CRY018",
+        "name": "Deprecated Apache HTTP Client (No TLS Validation)",
+        "pattern": r"new\s+DefaultHttpClient\s*\(",
+        "severity": "high",
+        "confidence": "high",
+        "owasp": "M5",
+        "description": "Deprecated Apache DefaultHttpClient used. This client was removed in Android 6.0+ and does not enforce modern TLS security by default.",
+        "remediation": "Use HttpsURLConnection or OkHttp with proper TLS configuration. DefaultHttpClient has been deprecated since API 22."
+    },
 ]

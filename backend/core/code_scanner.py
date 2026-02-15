@@ -193,10 +193,15 @@ def _has_java_sources(source_dirs: List[str]) -> bool:
 
 def _should_scan_smali(source_dirs: List[str]) -> bool:
     """
-    Scan smali only as fallback when jadx Java/Kotlin output is not available.
-    Content-based check avoids brittle path-name heuristics.
+    Scan smali alongside Java to maximize coverage.
+
+    jadx may fail to decompile some classes (memory limits, obfuscation) while
+    apktool always produces complete smali output.  Enabling both ensures that
+    first-party code missed by jadx is still analysed.  The dedup layer in
+    scan_source_code() and aggregate_findings() prevents double-counting when
+    both Java and smali produce the same finding.
     """
-    return not _has_java_sources(source_dirs or [])
+    return True
 
 
 def _is_vendor_smali_path(rel_path: str) -> bool:

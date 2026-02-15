@@ -136,6 +136,16 @@ SECRET_RULES = [
         "remediation": "Remove hardcoded tokens. Implement OAuth 2.0 or proper authentication flow."
     },
     {
+        "id": "SEC016",
+        "name": "Hardcoded Secret/Key Variable Assignment",
+        "pattern": r"(?i)(?:String\s+)?(?:key|secret|passphrase)\s*=\s*\"(?:[^\"]*(?:secret|password|private|encrypt|cipher|master)[^\"]*|[^\"]{32,})\"",
+        "severity": "high",
+        "confidence": "medium",
+        "owasp": "M1",
+        "description": "A variable named 'key', 'secret', or 'passphrase' is assigned a string literal that appears to contain a secret. Hardcoded secrets are trivially extractable from decompiled APKs.",
+        "remediation": "Store secrets in Android Keystore or retrieve them from a secure server at runtime. Never embed secret material in client-side code."
+    },
+    {
         "id": "SEC014",
         "name": "Firebase Database URL",
         "pattern": r"https://[a-zA-Z0-9-]+\.firebaseio\.com",
