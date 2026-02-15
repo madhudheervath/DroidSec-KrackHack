@@ -1,19 +1,24 @@
 #!/bin/bash
 
-# Start the Backend on an internal fixed port (8000)
-# We override the PORTEnv so it doesn't conflict with Next.js
+# Ensure we have a default port if Railway doesn't provide one (though it should)
+APP_PORT="${PORT:-3000}"
+
+# Start the Backend on a fixed internal port
 echo "Starting Backend on internal port 8000..."
 cd /app/backend
+# Specifically bind backend to localhost to keep it internal
 PORT=8000 python3 main.py &
 BACKEND_PID=$!
 
-# Wait for backend to be ready (optional but good)
-sleep 2
+# Wait for backend to be ready
+echo "Waiting for backend..."
+sleep 5
 
-# Start the Frontend on the Railway-assigned port
-echo "Starting Frontend on port $PORT..."
+# Start the Frontend on the Railway-assigned port, binding to 0.0.0.0
+echo "Starting Frontend on port $APP_PORT (binding to 0.0.0.0)..."
 cd /app/frontend
-npm start
+# Explicitly use 0.0.0.0 to ensure Railway's proxy can reach it
+HOSTNAME=0.0.0.0 npx next start -p "$APP_PORT"
 
-# Cleanup
+# Cleanup if frontend exits
 kill $BACKEND_PID
