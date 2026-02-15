@@ -32,6 +32,13 @@ from rules.binary_protection import analyze_binary_protections
 from rules.modern_heuristics import analyze_modern_heuristics
 from utils.library_analyzer import analyze_libraries
 
+# Load .env for local development
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+except ImportError:
+    pass
+
 # --- Config ---
 BASE_DIR = os.path.dirname(__file__)
 
@@ -586,7 +593,7 @@ def configure_ai(req: AIConfigRequest):
         raise HTTPException(500, f"Failed to configure AI: {e}")
 
 
-@app.post("/api/ai/analyze/{scan_id}")
+@app.api_route("/api/ai/analyze/{scan_id}", methods=["GET", "POST"])
 async def ai_deep_analysis(scan_id: str):
     """Run AI-powered deep analysis on scan results."""
     ai = get_ai_analyzer()
