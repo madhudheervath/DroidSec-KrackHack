@@ -180,37 +180,55 @@ Respond strictly with this JSON structure:
             return {"error": str(e), "available": True}
 
     async def chat(self, scan_id: str, message: str, report_data: Dict) -> str:
-        """Interactive AI chat."""
+        """Interactive AI chat with real conversational context."""
         if not self.is_available:
             return "AI chat not available."
 
+        ctx = self._build_scan_context(report_data)
+        chat_system = f"""{SYSTEM_PROMPT}
+
+You are having a CONVERSATION with a developer about their Android app's security scan results. The scan data is below — use it to answer questions accurately.
+
+CRITICAL RULES:
+- Answer ONLY what the user asks. Do NOT dump all findings unless asked.
+- Be conversational — short, focused answers to specific questions.
+- If asked about a specific finding, give details about THAT finding only.
+- If asked for code fixes, provide actual code snippets.
+- If asked yes/no questions, answer directly then explain briefly.
+- Reference specific file names, line numbers, and evidence from the scan data.
+- If the user asks something not covered by the scan data, say so honestly.
+
+--- SCAN DATA ---
+{ctx}
+--- END SCAN DATA ---"""
+
         if self.provider == "gemini":
-            # Gemini manages its own session state if we use start_chat, 
-            # but for simplicity we'll use a stateless approach if preferred.
-            # Here we reuse the existing gemini chat logic
             if not hasattr(self, "_gemini_chats"): self._gemini_chats = {}
             if scan_id not in self._gemini_chats:
-                ctx = self._build_scan_context(report_data)
-                self._gemini_chats[scan_id] = self.client.start_chat(history=[
-                    {"role": "user", "parts": [f"Context: {ctx}"]},
-                    {"role": "model", "parts": ["I've analyzed the scan. How can I help?"]}
-                ])
+                self._gemini_chats[scan_id] = self.client.start_chat(history=[])
             res = self._gemini_chats[scan_id].send_message(message)
             return res.text
         
         elif self.provider == "groq":
             if scan_id not in self.chat_history:
-                ctx = self._build_scan_context(report_data)
                 self.chat_history[scan_id] = [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Context: {ctx}"},
-                    {"role": "assistant", "content": "I've analyzed the scan. How can I help?"}
+                    {"role": "system", "content": chat_system},
                 ]
             
             self.chat_history[scan_id].append({"role": "user", "content": message})
+            
+            # Keep conversation manageable — trim old messages if too long
+            messages = self.chat_history[scan_id]
+            if len(messages) > 20:
+                # Keep system + last 16 messages
+                messages = [messages[0]] + messages[-16:]
+                self.chat_history[scan_id] = messages
+            
             completion = self.client.chat.completions.create(
-                messages=self.chat_history[scan_id],
+                messages=messages,
                 model=self.model_name,
+                temperature=0.4,
+                max_tokens=1024,
             )
             reply = completion.choices[0].message.content
             self.chat_history[scan_id].append({"role": "assistant", "content": reply})
