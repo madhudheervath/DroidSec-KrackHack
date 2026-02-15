@@ -42,12 +42,16 @@ except ImportError:
 # --- Config ---
 BASE_DIR = os.path.dirname(__file__)
 
-# Store runtime artifacts outside backend source tree by default.
-# This prevents uvicorn --reload from restarting on every upload/report write.
-DATA_ROOT = os.getenv("DROIDSEC_DATA_DIR", "/tmp/droidsec-runtime")
+# Store runtime artifacts in a persistent directory.
+# Default: backend/data/ for local persistence across restarts.
+# Railway / Docker: set DROIDSEC_DATA_DIR=/app/backend/data or mount a volume.
+_DEFAULT_DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_ROOT = os.getenv("DROIDSEC_DATA_DIR", _DEFAULT_DATA_DIR)
 UPLOAD_DIR = os.path.join(DATA_ROOT, "uploads")
 REPORT_DIR = os.path.join(DATA_ROOT, "reports")
 LEGACY_REPORT_DIR = os.path.join(BASE_DIR, "reports")
+# Also check the old /tmp location for migration
+_TMP_REPORT_DIR = "/tmp/droidsec-runtime/reports"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(REPORT_DIR, exist_ok=True)
 
@@ -82,6 +86,9 @@ def _report_dirs() -> List[str]:
     dirs = [REPORT_DIR]
     if LEGACY_REPORT_DIR != REPORT_DIR:
         dirs.append(LEGACY_REPORT_DIR)
+    # Also check old /tmp location for previously scanned reports
+    if os.path.isdir(_TMP_REPORT_DIR) and _TMP_REPORT_DIR != REPORT_DIR:
+        dirs.append(_TMP_REPORT_DIR)
     return dirs
 
 
@@ -161,6 +168,7 @@ def health():
         "jadx_exists": os.path.exists(jadx),
         "data_root": DATA_ROOT,
         "report_dir": REPORT_DIR,
+        "report_count": len(os.listdir(REPORT_DIR)) if os.path.isdir(REPORT_DIR) else 0,
     }
 
 

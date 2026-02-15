@@ -48,7 +48,10 @@ RUN npm install --omit=dev --no-audit --no-fund
 WORKDIR /app
 
 # Create necessary architecture directories
-RUN mkdir -p /app/backend/uploads /app/backend/reports
+RUN mkdir -p /app/backend/uploads /app/backend/reports /app/backend/data/uploads /app/backend/data/reports
+
+# Set persistent data directory (survives process restarts within same deploy)
+ENV DROIDSEC_DATA_DIR=/app/backend/data
 
 # Copy Startup script
 COPY start.sh /app/start.sh

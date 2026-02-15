@@ -6,6 +6,8 @@ import { Shield, Clock, FileText, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { apiUrl } from '../lib/api'
 
+const LS_KEY = 'droidsec_recent_scans'
+
 interface RecentReport {
     scan_id: string
     package?: string
@@ -13,18 +15,70 @@ interface RecentReport {
     timestamp: string
     score?: number | string
     grade?: string
+    findings_count?: number
+}
+
+/** Read cached scans from localStorage */
+function getCachedScans(): RecentReport[] {
+    if (typeof window === 'undefined') return []
+    try {
+        const raw = localStorage.getItem(LS_KEY)
+        if (raw) return JSON.parse(raw) as RecentReport[]
+    } catch { /* ignore */ }
+    return []
+}
+
+/** Save scans to localStorage (deduplicated, max 20) */
+export function saveCachedScans(scans: RecentReport[]) {
+    if (typeof window === 'undefined') return
+    try {
+        const seen = new Set<string>()
+        const deduped: RecentReport[] = []
+        for (const s of scans) {
+            if (!seen.has(s.scan_id)) {
+                seen.add(s.scan_id)
+                deduped.push(s)
+            }
+        }
+        deduped.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
+        localStorage.setItem(LS_KEY, JSON.stringify(deduped.slice(0, 20)))
+    } catch { /* ignore */ }
+}
+
+/** Add a single scan to the cache (called after upload completes) */
+export function addScanToCache(scan: RecentReport) {
+    const existing = getCachedScans()
+    saveCachedScans([scan, ...existing])
 }
 
 export default function RecentScans() {
     const [reports, setReports] = useState<RecentReport[]>([])
 
     useEffect(() => {
+        // 1. Show cached scans instantly
+        const cached = getCachedScans()
+        if (cached.length > 0) setReports(cached.slice(0, 10))
+
+        // 2. Fetch fresh data from API and merge
         fetch(apiUrl('/api/reports'))
             .then(res => res.json())
             .then(data => {
-                if (Array.isArray(data)) setReports(data.slice(0, 5))
+                if (Array.isArray(data) && data.length > 0) {
+                    // Merge API data with cache (API is source of truth)
+                    const merged = new Map<string, RecentReport>()
+                    for (const s of cached) merged.set(s.scan_id, s)
+                    for (const s of data) merged.set(s.scan_id, s) // API overwrites
+                    const all = Array.from(merged.values())
+                    all.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
+                    const top = all.slice(0, 10)
+                    setReports(top)
+                    saveCachedScans(all)
+                }
             })
-            .catch(err => console.error(err))
+            .catch(err => {
+                console.error('Failed to fetch reports:', err)
+                // Keep showing cached data on error
+            })
     }, [])
 
     if (reports.length === 0) return null

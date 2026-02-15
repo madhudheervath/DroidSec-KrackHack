@@ -21,6 +21,7 @@ yarn-error.log*
 # Application Context
 backend/uploads/*
 backend/reports/*
+backend/data/
 !backend/uploads/.gitkeep
 !backend/reports/.gitkeep
 

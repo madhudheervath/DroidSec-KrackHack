@@ -48,7 +48,7 @@ export default function CyberBackground() {
                 if (!ctx) return
                 ctx.beginPath()
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-                ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 0.5)`
+                ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 0.45)`
                 ctx.fill()
             }
         }
@@ -75,7 +75,7 @@ export default function CyberBackground() {
                     const dist = Math.sqrt(dx * dx + dy * dy)
 
                     if (dist < 120) {
-                        const alpha = (1 - dist / 120) * 0.06
+                        const alpha = (1 - dist / 120) * 0.03
                         ctx.strokeStyle = `rgba(${(p1.color.r + p2.color.r) >> 1}, ${(p1.color.g + p2.color.g) >> 1}, ${(p1.color.b + p2.color.b) >> 1}, ${alpha})`
                         ctx.lineWidth = 0.5
                         ctx.beginPath()
@@ -103,16 +103,15 @@ export default function CyberBackground() {
         <>
             {/* Gradient orbs */}
             <div className="fixed inset-0 -z-20 overflow-hidden pointer-events-none">
-                <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-purple-600/[0.04] blur-[100px]"
+                <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-purple-600/[0.012] blur-[140px]"
                      style={{ animation: 'orb-float-1 20s ease-in-out infinite' }} />
-                <div className="absolute top-1/2 -right-32 w-[400px] h-[400px] rounded-full bg-cyan-500/[0.03] blur-[100px]"
+                <div className="absolute top-1/2 -right-32 w-[400px] h-[400px] rounded-full bg-cyan-500/[0.008] blur-[140px]"
                      style={{ animation: 'orb-float-2 25s ease-in-out infinite' }} />
-                <div className="absolute -bottom-40 left-1/3 w-[450px] h-[450px] rounded-full bg-emerald-500/[0.03] blur-[100px]"
+                <div className="absolute -bottom-40 left-1/3 w-[450px] h-[450px] rounded-full bg-emerald-500/[0.008] blur-[140px]"
                      style={{ animation: 'orb-float-3 22s ease-in-out infinite' }} />
             </div>
 
-            {/* Grid pattern */}
-            <div className="fixed inset-0 -z-15 bg-grid pointer-events-none" />
+
 
             {/* Particle canvas */}
             <canvas

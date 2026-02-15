@@ -21,7 +21,7 @@ export default function Home() {
             </div>
             <div className="absolute -bottom-2 w-full h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
           </div>
-          <p className="text-xl md:text-2xl text-gray-400 font-mono max-w-2xl mx-auto mt-4 tracking-wide">
+          <p className="text-xl md:text-2xl text-gray-300 font-mono max-w-2xl mx-auto mt-4 tracking-wide">
             ADVANCED ANDROID SECURITY ANALYSIS PLATFORM
           </p>
         </header>
@@ -34,9 +34,9 @@ export default function Home() {
         <RecentScans />
 
         {/* Footer */}
-        <footer className="mt-24 text-center text-gray-600 font-mono text-xs md:text-sm">
-          <p className="tracking-widest mb-2">SYSTEM STATUS: <span className="text-green-500 animate-pulse">ONLINE</span> • SECURE CONNECTION ESTABLISHED</p>
-          <p className="opacity-50">POWERED BY GROQ AI & JADX DECOMPILER</p>
+        <footer className="mt-24 text-center text-gray-500 font-mono text-xs md:text-sm">
+          <p className="tracking-widest mb-2">SYSTEM STATUS: <span className="text-green-400 animate-pulse">ONLINE</span> • SECURE CONNECTION ESTABLISHED</p>
+          <p className="opacity-60">POWERED BY GROQ AI & JADX DECOMPILER</p>
         </footer>
       </div>
 

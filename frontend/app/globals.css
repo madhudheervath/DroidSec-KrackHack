@@ -3,20 +3,20 @@
 @tailwind utilities;
 
 :root {
-  --bg-primary: #0a0a12;
-  --bg-surface: #12121e;
-  --bg-surface2: #1a1a2e;
-  --surface2: #1a1a2e;
-  --border: #252540;
-  --text: #e4e4ef;
-  --text-muted: #7878a0;
-  --critical: #ff4757;
-  --high: #ff8c42;
-  --medium: #ffd166;
-  --info: #6ec6ff;
-  --accent: #7c5cfc;
-  --accent-glow: rgba(124, 92, 252, 0.3);
-  --success: #2ed573;
+  --bg-primary: #000000;
+  --bg-surface: #060608;
+  --bg-surface2: #0c0c12;
+  --surface2: #0c0c12;
+  --border: #18182a;
+  --text: #f0f0f8;
+  --text-muted: #8888a8;
+  --critical: #ff5263;
+  --high: #ff9955;
+  --medium: #ffe080;
+  --info: #7dd3ff;
+  --accent: #8b6cff;
+  --accent-glow: rgba(139, 108, 255, 0.35);
+  --success: #3de882;
 }
 
 * {
@@ -25,14 +25,15 @@
 }
 
 body {
-  background: var(--bg-primary);
+  background: #000000;
+  color: var(--text);
 }
 
 /* Glassmorphism card */
 .glass-card {
-  background: rgba(18, 18, 30, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
+  background: rgba(6, 6, 10, 0.92);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;
 }
 
@@ -107,8 +108,8 @@ body {
   font-size: 10px;
 }
 .chat-content pre {
-  background: rgba(10, 10, 20, 0.8);
-  border: 1px solid rgba(255,255,255,0.05);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255,255,255,0.06);
   border-radius: 8px;
   padding: 8px 10px;
   margin: 6px 0;
@@ -121,7 +122,7 @@ body {
   border: none;
   padding: 0;
 }
-.chat-content strong { color: #e4e4ef; }
+.chat-content strong { color: #f0f0f8; }
 .chat-content ul, .chat-content ol {
   padding-left: 16px;
   margin: 4px 0;
@@ -129,7 +130,7 @@ body {
 .chat-content li { margin: 2px 0; }
 .chat-content h1, .chat-content h2, .chat-content h3 {
   font-weight: 800;
-  color: #e4e4ef;
+  color: #f0f0f8;
   margin: 8px 0 4px;
 }
 
@@ -138,7 +139,8 @@ body {
   transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
 }
 .glass-card:hover {
-  border-color: rgba(124, 92, 252, 0.12);
+  border-color: rgba(124, 92, 252, 0.1);
+  box-shadow: 0 0 30px rgba(124, 92, 252, 0.04);
 }
 
 /* Background gradient orbs */
@@ -157,10 +159,4 @@ body {
   50% { transform: translate(35px, 50px) scale(1.04); }
 }
 
-/* Subtle grid pattern */
-.bg-grid {
-  background-image:
-    linear-gradient(rgba(124, 92, 252, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(124, 92, 252, 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-}
+/* Grid removed for cleaner aesthetic */

@@ -6,6 +6,7 @@ import { Upload, FileCode, AlertCircle, Loader2 } from 'lucide-react'
 import NeonCard from './NeonCard'
 import { useRouter } from 'next/navigation'
 import { apiUrl } from '../lib/api'
+import { addScanToCache } from './RecentScans'
 
 export default function UploadZone() {
     const [isDragging, setIsDragging] = useState(false)
@@ -86,6 +87,14 @@ export default function UploadZone() {
             if (scanId) {
                 // Backward compatibility: old backend returned full report in one call.
                 if (data.security_score) {
+                    addScanToCache({
+                        scan_id: scanId,
+                        filename: file.name,
+                        package: data.package || data.metadata?.package,
+                        score: data.security_score?.score ?? 0,
+                        grade: data.security_score?.grade ?? '?',
+                        timestamp: new Date().toISOString(),
+                    })
                     router.push(`/report/${scanId}`)
                     return
                 }
@@ -104,6 +113,21 @@ export default function UploadZone() {
                     const status = String(statusData?.status || '').toLowerCase()
 
                     if (status === 'completed') {
+                        // Fetch report data and cache it
+                        try {
+                            const reportRes = await fetch(apiUrl(`/api/report/${scanId}`), { cache: 'no-store' })
+                            if (reportRes.ok) {
+                                const reportData = await reportRes.json()
+                                addScanToCache({
+                                    scan_id: scanId,
+                                    filename: file.name,
+                                    package: reportData.package || reportData.metadata?.package,
+                                    score: reportData.security_score?.score ?? 0,
+                                    grade: reportData.security_score?.grade ?? '?',
+                                    timestamp: new Date().toISOString(),
+                                })
+                            }
+                        } catch { /* cache miss is ok */ }
                         router.push(`/report/${scanId}`)
                         return
                     }
