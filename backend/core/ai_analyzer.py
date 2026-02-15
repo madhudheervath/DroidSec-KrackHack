@@ -97,12 +97,15 @@ class AIAnalyzer:
         """Build a context string from scan results."""
         ctx_parts = []
         meta = report_data.get("metadata", {})
-        ctx_parts.append(f"""## App Information
-- **Package:** {meta.get('package', 'unknown')}
-- **Min SDK:** {meta.get('min_sdk', 'N/A')}
-- **Target SDK:** {meta.get('target_sdk', 'N/A')}
-- **Permissions:** {len(meta.get('permissions', []))}
-- **Exported Components:** {len(meta.get('exported_components', []))}""")
+        # Fields can be at top-level or inside metadata
+        pkg = report_data.get('package') or meta.get('package', 'unknown')
+        apk_name = report_data.get('apk_filename') or meta.get('apk_filename', '')
+        min_sdk = report_data.get('min_sdk') or meta.get('min_sdk', 'N/A')
+        target_sdk = report_data.get('target_sdk') or meta.get('target_sdk', 'N/A')
+        perms = report_data.get('permissions') or meta.get('permissions', [])
+        exports = report_data.get('exported_components') or meta.get('exported_components', [])
+
+        ctx_parts.append(f"""## App Info\n- Package: {pkg}\n- APK: {apk_name}\n- Min SDK: {min_sdk} | Target SDK: {target_sdk}\n- Permissions: {len(perms)}\n- Exported Components: {len(exports)}""")
 
         score = report_data.get("security_score", {})
         ctx_parts.append(f"""## Security Score
@@ -120,8 +123,9 @@ class AIAnalyzer:
                                 f"- Evidence: `{f.get('evidence', 'N/A')[:100]}`")
             ctx_parts.append("## Security Findings\n" + "\n\n".join(finding_strs))
 
-        if meta.get("libraries"):
-            ctx_parts.append(f"## Detected Libraries\n{', '.join(meta['libraries'])}")
+        if meta.get("libraries") or report_data.get("libraries"):
+            libs = meta.get('libraries') or report_data.get('libraries', [])
+            ctx_parts.append(f"## Libraries\n{', '.join(libs)}")
 
         return "\n\n".join(ctx_parts)
 
@@ -185,22 +189,21 @@ Respond strictly with this JSON structure:
             return "AI chat not available."
 
         ctx = self._build_scan_context(report_data)
-        chat_system = f"""{SYSTEM_PROMPT}
+        chat_system = f"""You are DroidSec AI, an Android security expert chatbot. You have the scan results for an app loaded below.
 
-You are having a CONVERSATION with a developer about their Android app's security scan results. The scan data is below — use it to answer questions accurately.
-
-CRITICAL RULES:
-- Answer ONLY what the user asks. Do NOT dump all findings unless asked.
-- Be conversational — short, focused answers to specific questions.
-- If asked about a specific finding, give details about THAT finding only.
-- If asked for code fixes, provide actual code snippets.
-- If asked yes/no questions, answer directly then explain briefly.
-- Reference specific file names, line numbers, and evidence from the scan data.
-- If the user asks something not covered by the scan data, say so honestly.
+RESPONSE RULES — follow these strictly:
+1. Keep answers SHORT. 1-3 sentences for simple questions. No essays.
+2. Answer EXACTLY what was asked. Nothing more.
+3. For yes/no questions: answer yes or no FIRST, then 1 sentence why.
+4. For "what is X" questions: give the direct answer, not a lecture.
+5. For code fix requests: give the code snippet immediately.
+6. NEVER list all findings unless the user explicitly asks for "all findings" or "full summary".
+7. Use the scan data below for facts. If data doesn't cover the question, say "not in scan data".
+8. The app package is: {report_data.get('package') or report_data.get('metadata',{}).get('package','unknown')}
 
 --- SCAN DATA ---
 {ctx}
---- END SCAN DATA ---"""
+--- END ---"""
 
         if self.provider == "gemini":
             if not hasattr(self, "_gemini_chats"): self._gemini_chats = {}
