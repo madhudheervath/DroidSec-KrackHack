@@ -554,43 +554,6 @@ python -m uvicorn main:app --reload
 
 ---
 
-## Troubleshooting
-
-### `ModuleNotFoundError: No module named 'pydantic'`
-
-You are using system Python instead of project venv.
-
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Frontend `Cannot find module './682.js'` or `vendor-chunks/@swc.js`
-
-The Next.js build cache is stale/corrupted.
-
-```bash
-cd frontend
-npm run clean
-npm install
-npm run dev
-```
-
-### `Failed to proxy http://127.0.0.1:8000/api/... socket hang up`
-
-Backend is not reachable. Ensure backend is running first, or set:
-
-```bash
-NEXT_PUBLIC_BACKEND_URL=https://<your-backend-domain>
-```
-
----
-
----
-
 ## 🔎 Vulnerability Detection Categories
 
 DroidSec performs comprehensive security analysis across 15 specialized rule modules:
